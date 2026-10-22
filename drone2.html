@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>無人機 3D 互動探索館 | 飛行原理・多元活動・無人機足球</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- 引入 Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #070b14;
+            color: #f8fafc;
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 0 15px rgba(14, 165, 233, 0.1);
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+            color: white;
+            border-color: #38bdf8;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.45);
+        }
+        .btn-action {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(56, 189, 248, 0.35);
+        }
+        .btn-action:active {
+            transform: translateY(0px);
+        }
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.4);
+            border-radius: 9999px;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.75; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.04); }
+        }
+        .goal-flash {
+            animation: pulse-glow 0.6s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative">
+
+    <!-- 3D 畫布容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- 3D 浮動標籤層 (將 3D 座標投影到 2D 畫面) -->
+    <div id="labels-container" class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+        <!-- 4個螺旋槳標籤 (只在單元1顯示) -->
+        <div id="label-m0" class="absolute transform -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-950/90 border border-sky-400 text-sky-300 shadow-lg transition-opacity duration-300">
+            M1 左前：正槳 (CW 順時針 ↻)
+        </div>
+        <div id="label-m1" class="absolute transform -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-950/90 border border-rose-400 text-rose-300 shadow-lg transition-opacity duration-300">
+            M2 右前：反槳 (CCW 逆時針 ↺)
+        </div>
+        <div id="label-m2" class="absolute transform -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-950/90 border border-rose-400 text-rose-300 shadow-lg transition-opacity duration-300">
+            M3 左後：反槳 (CCW 逆時針 ↺)
+        </div>
+        <div id="label-m3" class="absolute transform -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-950/90 border border-sky-400 text-sky-300 shadow-lg transition-opacity duration-300">
+            M4 右後：正槳 (CW 順時針 ↻)
+        </div>
+
+        <!-- 無人機足球場地尺寸標籤 (只在單元3顯示) -->
+        <div id="label-cage-dim" class="hidden absolute transform -translate-x-1/2 -translate-y-1/2 px-3 py-1 rounded-lg text-xs font-bold bg-amber-950/90 border border-amber-400 text-amber-300 shadow-lg">
+            標準賽事安全網籠：長 6m × 寬 3m × 高 3m
+        </div>
+        <div id="label-ball-dim" class="hidden absolute transform -translate-x-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950/90 border border-emerald-400 text-emerald-300 shadow-lg">
+            Ø 200mm 球型防撞保護框
+        </div>
+    </div>
+
+    <!-- 進球慶祝橫幅 -->
+    <div id="goal-banner" class="pointer-events-none hidden fixed inset-x-0 top-24 z-30 flex justify-center">
+        <div class="goal-flash bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-2xl md:text-3xl shadow-2xl border-2 border-white flex items-center gap-3">
+            <i class="ph-fill ph-trophy text-3xl"></i>
+            <span>GOAL! 穿越龍門得分！+10 分</span>
+        </div>
+    </div>
+
+    <!-- 頂部導覽列 -->
+    <header class="relative z-20 flex flex-col md:flex-row items-center justify-between px-4 py-3 gap-3 pointer-events-none">
+        <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-3 pointer-events-auto">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-md">
+                <i class="ph-fill ph-drone text-2xl text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-base md:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    無人機 3D 互動探索館
+                    <span class="text-[11px] bg-sky-500/20 text-sky-300 border border-sky-400/30 px-2 py-0.5 rounded-full font-semibold">Three.js WebGL</span>
+                </h1>
+                <p class="text-xs text-slate-400">拖曳畫面旋轉 3D 視角・滾輪縮放・點擊按鈕即時互動</p>
+            </div>
+        </div>
+
+        <!-- 三大主題切換按鈕 -->
+        <nav class="glass-panel p-1.5 rounded-2xl flex flex-wrap justify-center gap-1.5 pointer-events-auto">
+            <button id="tab-btn-1" onclick="switchSection(1)" class="tab-active px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center gap-2 transition-all">
+                <i class="ph-bold ph-fan text-base"></i>
+                <span>1. 飛行原理與正反槳</span>
+            </button>
+            <button id="tab-btn-2" onclick="switchSection(2)" class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2 transition-all">
+                <i class="ph-bold ph-sparkle text-base"></i>
+                <span>2. 無人機衍生多元活動</span>
+            </button>
+            <button id="tab-btn-3" onclick="switchSection(3)" class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2 transition-all">
+                <i class="ph-bold ph-soccer-ball text-base"></i>
+                <span>3. 無人機足球 (200mm & 場地)</span>
+            </button>
+        </nav>
+    </header>
+
+    <!-- 主要內容區：左側知識面板 + 右側互動控制面板 -->
+    <main class="relative z-20 flex flex-col md:flex-row justify-between items-stretch md:items-end h-[calc(100%-88px)] p-4 gap-4 pointer-events-none">
+
+        <!-- ================= 單元 1：飛行原理與正反槳 ================= -->
+        <div id="section-1" class="w-full md:w-auto flex flex-col md:flex-row justify-between items-stretch md:items-end w-full gap-4">
+            <!-- 左側解說卡 -->
+            <div class="glass-panel rounded-2xl p-4 md:p-5 w-full md:w-[410px] max-h-[44vh] md:max-h-[75vh] overflow-y-auto pointer-events-auto space-y-3.5">
+                <div class="flex items-center justify-between border-b border-slate-700/70 pb-2.5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-scales"></i> Aerodynamics & Torque
+                    </span>
+                    <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full">四軸飛行器力學</span>
+                </div>
+
+                <h2 class="text-lg md:text-xl font-bold text-white">為何無人機要分「正槳」與「反槳」？</h2>
+
+                <p class="text-xs md:text-sm text-slate-300 leading-relaxed">
+                    根據<strong class="text-sky-300">牛頓第三運動定律（作用力與反作用力）</strong>：當螺旋槳向下推動空氣產生升力時，空氣也會對機身產生一個方向相反的<strong class="text-amber-300">「反扭力（的反作用矩）」</strong>。
+                </p>
+
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                    <div class="bg-sky-950/50 border border-sky-500/40 rounded-xl p-3">
+                        <div class="flex items-center gap-1.5 text-sky-300 font-bold text-xs md:text-sm mb-1">
+                            <i class="ph-bold ph-arrows-clockwise text-base"></i>
+                            <span>正槳 (CW 順時針)</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-normal">
+                            安裝於對角線（<strong class="text-white">左前 M1、右後 M4</strong>）。順時針旋轉向下壓風，對機身產生逆時針反扭力。
+                        </p>
+                    </div>
+                    <div class="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3">
+                        <div class="flex items-center gap-1.5 text-rose-300 font-bold text-xs md:text-sm mb-1">
+                            <i class="ph-bold ph-arrows-counter-clockwise text-base"></i>
+                            <span>反槳 (CCW 逆時針)</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-normal">
+                            安裝於另一對角（<strong class="text-white">右前 M2、左後 M3</strong>）。逆時針旋轉向下壓風，對機身產生順時針反扭力。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 space-y-1.5">
+                    <div class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <i class="ph-fill ph-lightbulb"></i>
+                        <span>角動量守恆與姿態控制秘訣：</span>
+                    </div>
+                    <ul class="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                        <li><strong class="text-white">抵消自旋：</strong>2 個正槳 + 2 個反槳同時旋轉，反扭力剛好互相抵消（淨扭矩 = 0），機身才能穩定懸停！</li>
+                        <li><strong class="text-white">升降（Throttle）：</strong>四槳同時加速或減速，改變總升力。</li>
+                        <li><strong class="text-white">偏航轉向（Yaw）：</strong>故意加快正槳、減慢反槳，打破扭力平衡，讓機頭精準左右旋轉。</li>
+                        <li><strong class="text-white">俯仰/橫滾（Pitch/Roll）：</strong>後排加速、前排減速，機身前傾產生向前推進分力。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 右側飛行實驗控制台 -->
+            <div class="glass-panel rounded-2xl p-4 w-full md:w-[360px] pointer-events-auto space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-Sliders"></i> 3D 飛行力學模擬器
+                    </span>
+                    <span id="physics-status-badge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                        扭力平衡：穩定懸停
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setPhysicsState('hover')" id="btn-phys-hover" class="btn-action bg-sky-600/40 border border-sky-400 text-white rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-equals"></i> 1. 穩定懸停 (平衡)
+                    </button>
+                    <button onclick="setPhysicsState('ascend')" id="btn-phys-ascend" class="btn-action bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-arrow-fat-lines-up"></i> 2. 全槳加速 (上升)
+                    </button>
+                    <button onclick="setPhysicsState('pitch')" id="btn-phys-pitch" class="btn-action bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-arrow-up-right"></i> 3. 後槳加速 (前進)
+                    </button>
+                    <button onclick="setPhysicsState('yaw')" id="btn-phys-yaw" class="btn-action bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <i class="ph-bold ph-arrows-clockwise"></i> 4. 正槳加速 (偏航)
+                    </button>
+                </div>
+
+                <!-- 破除迷思：全部換成正槳會怎樣？ -->
+                <button onclick="setPhysicsState('all_cw')" id="btn-phys-allcw" class="btn-action w-full bg-gradient-to-r from-rose-600/80 to-amber-600/80 hover:from-rose-500 hover:to-amber-500 border border-rose-400 text-white rounded-xl py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-2 shadow-lg">
+                    <i class="ph-fill ph-warning-octagon text-base"></i>
+                    <span>實驗：若 4 隻都裝「正槳」會怎樣？（失控自旋）</span>
+                </button>
+
+                <!-- 即時轉速監測條 -->
+                <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2">
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>即時馬達轉速與氣流推力</span>
+                        <span id="physics-desc-short" class="text-sky-300 font-semibold">四槳均速 50%</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <div class="flex justify-between text-[11px] mb-0.5">
+                                <span class="text-sky-300 font-bold">M1, M4 正槳 (CW)</span>
+                                <span id="rpm-cw" class="font-mono text-white">5000 RPM</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="bar-cw" class="bg-sky-400 h-full transition-all duration-300" style="width: 50%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[11px] mb-0.5">
+                                <span class="text-rose-300 font-bold">M2, M3 反槳 (CCW)</span>
+                                <span id="rpm-ccw" class="font-mono text-white">5000 RPM</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="bar-ccw" class="bg-rose-400 h-full transition-all duration-300" style="width: 50%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 單元 2：無人機衍生多元活動 ================= -->
+        <div id="section-2" class="hidden w-full flex flex-col md:flex-row justify-between items-stretch md:items-end gap-4">
+            <!-- 左側活動深度介紹卡 -->
+            <div class="glass-panel rounded-2xl p-4 md:p-5 w-full md:w-[420px] max-h-[44vh] md:max-h-[75vh] overflow-y-auto pointer-events-auto space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-700/70 pb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-Circles-Four"></i> Drone Applications & Sports
+                    </span>
+                    <span id="act-tag" class="text-xs bg-purple-500/20 text-purple-300 border border-purple-400/30 px-2.5 py-0.5 rounded-full">STEAM 教育應用</span>
+                </div>
+
+                <h2 id="act-title" class="text-lg md:text-xl font-bold text-white">1. 無人機編程 (Drone Coding)</h2>
+                <p id="act-desc" class="text-xs md:text-sm text-slate-300 leading-relaxed">
+                    透過積木編程（Scratch / Blockly）或 Python 語言，學生無需手控搖桿，而是編寫演算法控制無人機自動起飛、按三維座標（X, Y, Z）精準巡航、定點懸停及任務降落。結合室內光流定位與飛行時間測距（ToF）感測器，訓練空間幾何與運算思維。
+                </p>
+
+                <div id="act-highlights" class="bg-slate-900/90 border border-slate-700 rounded-xl p-3 space-y-1.5 text-xs text-slate-300">
+                    <div><strong class="text-sky-300">核心技術：</strong>Python SDK、光流定位感測、PID 姿態自動控制</div>
+                    <div><strong class="text-emerald-300">學習重點：</strong>三維笛卡兒座標系、迴圈與條件判斷、自動化路徑規劃</div>
+                </div>
+
+                <!-- 互動模擬提示區 -->
+                <div id="act-extra-box" class="bg-slate-950/90 border border-sky-500/30 rounded-xl p-3 font-mono text-xs text-emerald-300">
+                    <div class="text-[11px] text-slate-400 mb-1 flex justify-between">
+                        <span>drone_mission.py</span>
+                        <span class="text-sky-400">正在執行自動座標巡航...</span>
+                    </div>
+                    <div id="code-lines" class="space-y-0.5 text-[11px]">
+                        <div class="text-yellow-300">&gt; drone.takeoff()</div>
+                        <div>&gt; drone.go_xyz(x=200, y=150, z=0, speed=80)</div>
+                        <div>&gt; drone.go_xyz(x=-200, y=150, z=200, speed=80)</div>
+                        <div>&gt; drone.flip("forward") &amp; drone.land()</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側四大活動切換器 -->
+            <div class="glass-panel rounded-2xl p-4 w-full md:w-[360px] pointer-events-auto space-y-3">
+                <div class="text-xs font-bold text-purple-300 flex items-center justify-between">
+                    <span>點擊切換 4 種衍生無人機活動 3D 展示：</span>
+                    <i class="ph-bold ph-cube text-base"></i>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <button onclick="setActivityMode('coding')" id="btn-act-coding" class="btn-action bg-sky-600/40 border border-sky-400 text-white rounded-xl p-3 text-left space-y-1">
+                        <div class="flex items-center justify-between">
+                            <i class="ph-fill ph-code text-xl text-sky-300"></i>
+                            <span class="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded">STEAM</span>
+                        </div>
+                        <div class="font-bold text-xs md:text-sm">無人機編程</div>
+                        <div class="text-[11px] text-slate-300">三維座標自主巡航</div>
+                    </button>
+
+                    <button onclick="setActivityMode('swarm')" id="btn-act-swarm" class="btn-action bg-slate-800/80 border border-slate-700 text-slate-200 rounded-xl p-3 text-left space-y-1">
+                        <div class="flex items-center justify-between">
+                            <i class="ph-fill ph-sparkle text-xl text-purple-400"></i>
+                            <span class="text-[10px] bg-purple-500/30 px-1.5 py-0.5 rounded">RTK 定位</span>
+                        </div>
+                        <div class="font-bold text-xs md:text-sm">無人機群飛</div>
+                        <div class="text-[11px] text-slate-400">燈光編隊立體展演</div>
+                    </button>
+
+                    <button onclick="setActivityMode('fpv')" id="btn-act-fpv" class="btn-action bg-slate-800/80 border border-slate-700 text-slate-200 rounded-xl p-3 text-left space-y-1">
+                        <div class="flex items-center justify-between">
+                            <i class="ph-fill ph-goggles text-xl text-rose-400"></i>
+                            <span class="text-[10px] bg-rose-500/30 px-1.5 py-0.5 rounded">第一人稱</span>
+                        </div>
+                        <div class="font-bold text-xs md:text-sm">FPV 穿越競速</div>
+                        <div class="text-[11px] text-slate-400">高速穿越霓虹拱門</div>
+                    </button>
+
+                    <button onclick="setActivityMode('soccer_preview')" id="btn-act-soccer" class="btn-action bg-slate-800/80 border border-slate-700 text-slate-200 rounded-xl p-3 text-left space-y-1">
+                        <div class="flex items-center justify-between">
+                            <i class="ph-fill ph-soccer-ball text-xl text-amber-400"></i>
+                            <span class="text-[10px] bg-amber-500/30 px-1.5 py-0.5 rounded">團體競技</span>
+                        </div>
+                        <div class="font-bold text-xs md:text-sm">無人機足球</div>
+                        <div class="text-[11px] text-slate-400">防撞球框攻防對抗</div>
+                    </button>
+                </div>
+
+                <!-- 群飛專屬隊形切換 / FPV 第一人稱切換 -->
+                <div id="sub-control-swarm" class="hidden pt-1 border-t border-slate-700/80 flex items-center justify-between gap-2">
+                    <span class="text-xs text-purple-300 font-semibold">群飛 3D 隊形切換：</span>
+                    <div class="flex gap-1.5">
+                        <button onclick="setSwarmShape('sphere')" class="px-2.5 py-1 rounded-lg bg-purple-600/50 border border-purple-400 text-xs font-bold text-white">球體</button>
+                        <button onclick="setSwarmShape('dna')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-purple-600/40 border border-slate-600 text-xs font-bold text-slate-200">雙螺旋</button>
+                        <button onclick="setSwarmShape('star')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-purple-600/40 border border-slate-600 text-xs font-bold text-slate-200">星環</button>
+                    </div>
+                </div>
+
+                <div id="sub-control-fpv" class="hidden pt-1 border-t border-slate-700/80 flex items-center justify-between">
+                    <span class="text-xs text-rose-300 font-semibold">體驗飛行員飛行眼鏡視角：</span>
+                    <button onclick="toggleFpvCamera()" id="btn-fpv-cam" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow">
+                        <i class="ph-bold ph-video-camera"></i> 切換 FPV 第一人稱視角
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 單元 3：無人機足球 (Harry Potter・6x3x3m・200mm) ================= -->
+        <div id="section-3" class="hidden w-full flex flex-col md:flex-row justify-between items-stretch md:items-end gap-4">
+            <!-- 左側無人機足球完整介紹卡 -->
+            <div class="glass-panel rounded-2xl p-4 md:p-5 w-full md:w-[440px] max-h-[45vh] md:max-h-[76vh] overflow-y-auto pointer-events-auto space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-700/70 pb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-trophy"></i> FIDA / FAI Drone Soccer
+                    </span>
+                    <span class="text-xs bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2.5 py-0.5 rounded-full">新興國際電競運動</span>
+                </div>
+
+                <h2 class="text-lg md:text-xl font-bold text-white">無人機足球：現實版「空中魁地奇」</h2>
+
+                <!-- 1. 由來 (Harry Potter) -->
+                <div class="bg-amber-950/40 border border-amber-500/40 rounded-xl p-3 space-y-1">
+                    <div class="text-xs md:text-sm font-bold text-amber-300 flex items-center gap-1.5">
+                        <i class="ph-fill ph-magic-wand text-base"></i>
+                        <span>1. 運動由來：靈感源自《哈利波特》魁地奇！</span>
+                    </div>
+                    <p class="text-xs text-slate-200 leading-relaxed">
+                        無人機足球（Drone Soccer）於 2016 年由韓國全州研發並推廣，其設計靈感正是源自<strong class="text-amber-300">《哈利波特》（Harry Potter）魔法世界中的「魁地奇」（Quidditch）比賽</strong>——讓選手操控包裹在球型護罩內的無人機，在半空中高速衝撞、防守，並穿越懸空的圓環龍門得分！現已成為國際航空聯盟（FAI）及 FIDA 認證的全球性科技體育賽事。
+                    </p>
+                </div>
+
+                <!-- 2. 6m x 3m x 3m 場地規格 -->
+                <div class="bg-sky-950/40 border border-sky-500/40 rounded-xl p-3 space-y-1">
+                    <div class="text-xs md:text-sm font-bold text-sky-300 flex items-center gap-1.5">
+                        <i class="ph-fill ph-bounding-box text-base"></i>
+                        <span>2. 標準比賽場地：6m × 3m × 3m 安全網籠</span>
+                    </div>
+                    <p class="text-xs text-slate-200 leading-relaxed">
+                        針對中小型及青少年主流賽事（Class 200 級別），標準競技場地為<strong class="text-sky-300">長 6 公尺 × 寬 3 公尺 × 高 3 公尺（6m × 3m × 3m）</strong>的全封閉安全防護網籠。場地兩端半空各懸掛一個圓形龍門。只有配戴識別燈的<strong class="text-white">「前鋒機（Striker）」</strong>穿過對方圓環龍門才算得分，其餘隊員則擔任後衛攔截。
+                    </p>
+                </div>
+
+                <!-- 3. 200mm 大小無人機足球 -->
+                <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3 space-y-1">
+                    <div class="text-xs md:text-sm font-bold text-emerald-300 flex items-center gap-1.5">
+                        <i class="ph-fill ph-globe-hemisphere-west text-base"></i>
+                        <span>3. 200mm 球型無人機（Class 200 規格）</span>
+                    </div>
+                    <p class="text-xs text-slate-200 leading-relaxed">
+                        教育界與青少年比賽最普及的是<strong class="text-emerald-300">直徑 200mm（20 公分，約手球大小）</strong>的無人機足球。外部採用高韌性碳纖維或工程塑膠（PP/PE）交織成<strong class="text-white">球型防撞保護籠</strong>，重量僅約 100g–110g。即使在空中激烈碰撞，內部四軸螺旋槳也不會受損，具備極高安全性與操控靈活性！
+                    </p>
+                </div>
+            </div>
+
+            <!-- 右側無人機足球實戰操控器 -->
+            <div class="glass-panel rounded-2xl p-4 w-full md:w-[370px] pointer-events-auto space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-700/70 pb-2">
+                    <div>
+                        <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
+                            <i class="ph-fill ph-game-controller"></i> 試玩 200mm 無人機足球！
+                        </span>
+                        <p class="text-[11px] text-slate-400">操控紅色前鋒機，穿過前方黃色圓環龍門得分</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 block">SCORE 得分</span>
+                        <span id="soccer-score" class="text-2xl font-black text-amber-400 font-mono">0</span>
+                    </div>
+                </div>
+
+                <!-- 視角與特寫切換 -->
+                <div class="flex gap-2">
+                    <button onclick="setSoccerView('arena')" id="btn-view-arena" class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600/50 border border-sky-400 text-xs font-bold text-white flex items-center justify-center gap-1">
+                        <i class="ph-bold ph-court-basketball"></i> 6×3×3m 全景球場
+                    </button>
+                    <button onclick="setSoccerView('closeup')" id="btn-view-closeup" class="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 flex items-center justify-center gap-1">
+                        <i class="ph-bold ph-magnifying-glass-plus"></i> 200mm 球框解剖特寫
+                    </button>
+                </div>
+
+                <!-- 虛擬搖桿與鍵盤控制區 -->
+                <div class="grid grid-cols-2 gap-3 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                    <!-- 左搖桿：高度與復位 -->
+                    <div class="flex flex-col items-center justify-center space-y-1.5">
+                        <span class="text-[11px] text-slate-400 font-semibold">升降控制 (W / S)</span>
+                        <button onmousedown="startMove('up')" onmouseup="stopMove('up')" ontouchstart="startMove('up')" ontouchend="stopMove('up')" class="btn-action w-16 h-9 rounded-xl bg-slate-800 hover:bg-sky-600 border border-slate-600 flex items-center justify-center text-white font-bold text-xs gap-1">
+                            <i class="ph-bold ph-caret-up"></i> 上升
+                        </button>
+                        <button onclick="resetSoccerBall()" class="w-16 h-7 rounded-lg bg-slate-900 hover:bg-slate-700 border border-slate-700 text-[11px] text-amber-300 font-bold">
+                            重置位置
+                        </button>
+                        <button onmousedown="startMove('down')" onmouseup="stopMove('down')" ontouchstart="startMove('down')" ontouchend="stopMove('down')" class="btn-action w-16 h-9 rounded-xl bg-slate-800 hover:bg-sky-600 border border-slate-600 flex items-center justify-center text-white font-bold text-xs gap-1">
+                            <i class="ph-bold ph-caret-down"></i> 下降
+                        </button>
+                    </div>
+
+                    <!-- 右搖桿：前後左右推進 -->
+                    <div class="flex flex-col items-center justify-center space-y-1">
+                        <span class="text-[11px] text-slate-400 font-semibold">水平推進 (方向鍵)</span>
+                        <button onmousedown="startMove('forward')" onmouseup="stopMove('forward')" ontouchstart="startMove('forward')" ontouchend="stopMove('forward')" class="btn-action w-11 h-9 rounded-xl bg-amber-500/80 hover:bg-amber-400 text-slate-950 font-black flex items-center justify-center">
+                            <i class="ph-bold ph-arrow-up text-base"></i>
+                        </button>
+                        <div class="flex gap-1.5">
+                            <button onmousedown="startMove('left')" onmouseup="stopMove('left')" ontouchstart="startMove('left')" ontouchend="stopMove('left')" class="btn-action w-11 h-9 rounded-xl bg-slate-800 hover:bg-sky-600 border border-slate-600 text-white flex items-center justify-center">
+                                <i class="ph-bold ph-arrow-left text-base"></i>
+                            </button>
+                            <button onmousedown="startMove('backward')" onmouseup="stopMove('backward')" ontouchstart="startMove('backward')" ontouchend="stopMove('backward')" class="btn-action w-11 h-9 rounded-xl bg-slate-800 hover:bg-sky-600 border border-slate-600 text-white flex items-center justify-center">
+                                <i class="ph-bold ph-arrow-down text-base"></i>
+                            </button>
+                            <button onmousedown="startMove('right')" onmouseup="stopMove('right')" ontouchstart="startMove('right')" ontouchend="stopMove('right')" class="btn-action w-11 h-9 rounded-xl bg-slate-800 hover:bg-sky-600 border border-slate-600 text-white flex items-center justify-center">
+                                <i class="ph-bold ph-arrow-right text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 一鍵自動射門演示 -->
+                <button onclick="triggerAutoGoalDemo()" class="btn-action w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg">
+                    <i class="ph-fill ph-lightning text-base"></i>
+                    <span>一鍵示範：前鋒突破防守穿環射門！</span>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ==========================================
+        // 全域狀態與 Three.js 核心變數
+        // ==========================================
+        let scene, camera, renderer, clock;
+        let currentSection = 1;       // 1: 飛行原理, 2: 衍生活動, 3: 無人機足球
+        let physicsState = 'hover';   // hover, ascend, pitch, yaw, all_cw
+        let activityMode = 'coding';  // coding, swarm, fpv, soccer_preview
+        let swarmShape = 'sphere';    // sphere, dna, star
+        let fpvCamActive = false;
+        let soccerViewMode = 'arena'; // arena, closeup
+
+        // 3D 群組容器
+        let groupSection1 = new THREE.Group();
+        let groupSection2 = new THREE.Group();
+        let groupSection3 = new THREE.Group();
+
+        // 單元 1：四軸無人機與正反槳物件
+        let mainDrone, propBlades = [], airflowParticles = [], torqueArrows = [];
+        let motorPositions = [];
+
+        // 單元 2：衍生活動物件
+        let codingDrone, codingPathLine, codingWaypoints = [];
+        let swarmDrones = [];
+        let fpvDrone, fpvGates = [], fpvTrackCurve;
+        let previewSoccerBalls = [];
+
+        // 單元 3：無人機足球場地 (6m x 3m x 3m) 與 200mm 無人機球
+        let playerSoccerDrone, defenderDrone1, defenderDrone2, closeupSoccerDrone;
+        let goalRingRight, goalRingLeft;
+        let soccerScore = 0;
+        let autoGoalActive = false;
+        let autoGoalProgress = 0;
+        let goalCooldown = 0;
+
+        // 玩家操控狀態
+        const moveState = { up: false, down: false, left: false, right: false, forward: false, backward: false };
+        const playerVelocity = new THREE.Vector3();
+
+        // 相機自訂軌道控制變數
+        let isPointerDown = false;
+        let pointerX = 0, pointerY = 0;
+        let camTheta = 0.6, camPhi = 1.05, camRadius = 6.2;
+        let targetCamTheta = 0.6, targetCamPhi = 1.05, targetCamRadius = 6.2;
+        let camLookAt = new THREE.Vector3(0, 0.5, 0);
+        let targetLookAt = new THREE.Vector3(0, 0.5, 0);
+
+        // ==========================================
+        // 初始化 Three.js 場景
+        // ==========================================
+        function initThreeScene() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070b14);
+            scene.fog = new THREE.FogExp2(0x070b14, 0.032);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
+            clock = new THREE.Clock();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 燈光配置
+            const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.65);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.1);
+            dirLight.position.set(8, 15, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const warmLight = new THREE.PointLight(0xf59e0b, 0.9, 25);
+            warmLight.position.set(-8, 6, -6);
+            scene.add(warmLight);
+
+            // 科技感底部網格地板
+            const gridHelper = new THREE.GridHelper(36, 36, 0x0ea5e9, 0x1e293b);
+            gridHelper.position.y = -1.6;
+            scene.add(gridHelper);
+
+            // 加入三個主題群組
+            scene.add(groupSection1);
+            scene.add(groupSection2);
+            scene.add(groupSection3);
+
+            // 建立三大單元 3D 模型
+            buildSection1Models();
+            buildSection2Models();
+            buildSection3Models();
+
+            // 預設顯示單元 1
+            groupSection1.visible = true;
+            groupSection2.visible = false;
+            groupSection3.visible = false;
+
+            // 綁定滑鼠、觸控與鍵盤事件
+            setupInteractionEvents();
+        }
+
+        // ==========================================
+        // 單元 1 模型：四軸無人機與正槳(CW)/反槳(CCW)
+        // ==========================================
+        function buildSection1Models() {
+            mainDrone = new THREE.Group();
+            groupSection1.add(mainDrone);
+
+            // 中心機身
+            const bodyGeo = new THREE.BoxGeometry(1.1, 0.32, 1.5);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.25 });
+            const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+            mainDrone.add(bodyMesh);
+
+            // 機頂流線裝甲與機頭方向指示燈
+            const topGeo = new THREE.BoxGeometry(0.85, 0.16, 1.1);
+            const topMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.5, roughness: 0.3 });
+            const topMesh = new THREE.Mesh(topGeo, topMat);
+            topMesh.position.y = 0.22;
+            mainDrone.add(topMesh);
+
+            // 機頭方向錐 (指向 -Z 前方)
+            const noseGeo = new THREE.ConeGeometry(0.22, 0.45, 4);
+            const noseMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const noseCone = new THREE.Mesh(noseGeo, noseMat);
+            noseCone.rotation.x = -Math.PI / 2;
+            noseCone.rotation.y = Math.PI / 4;
+            noseCone.position.set(0, 0.05, -0.95);
+            mainDrone.add(noseCone);
+
+            // 四個機臂與馬達座標：
+            // 0: 左前 (CW 正槳), 1: 右前 (CCW 反槳), 2: 左後 (CCW 反槳), 3: 右後 (CW 正槳)
+            motorPositions = [
+                { x: -1.35, z: -1.35, isCW: true,  name: 'M1' }, // 左前：正槳 CW
+                { x:  1.35, z: -1.35, isCW: false, name: 'M2' }, // 右前：反槳 CCW
+                { x: -1.35, z:  1.35, isCW: false, name: 'M3' }, // 左後：反槳 CCW
+                { x:  1.35, z:  1.35, isCW: true,  name: 'M4' }  // 右後：正槳 CW
+            ];
+
+            motorPositions.forEach((m, idx) => {
+                // 碳纖維機臂
+                const armLen = Math.sqrt(m.x * m.x + m.z * m.z);
+                const armGeo = new THREE.CylinderGeometry(0.07, 0.07, armLen, 12);
+                const armMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+                const arm = new THREE.Mesh(armGeo, armMat);
+                arm.position.set(m.x / 2, 0, m.z / 2);
+                arm.rotation.z = Math.PI / 2;
+                arm.rotation.y = -Math.atan2(m.z, m.x);
+                mainDrone.add(arm);
+
+                // 無刷馬達座
+                const motorColor = m.isCW ? 0x0ea5e9 : 0xf43f5e;
+                const motorGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.28, 20);
+                const motorMat = new THREE.MeshStandardMaterial({ color: motorColor, metalness: 0.6, roughness: 0.3 });
+                const motor = new THREE.Mesh(motorGeo, motorMat);
+                motor.position.set(m.x, 0.12, m.z);
+                mainDrone.add(motor);
+
+                // 螺旋槳群組 (具攻角傾角以體現正反槳差異)
+                const propGroup = new THREE.Group();
+                propGroup.position.set(m.x, 0.3, m.z);
+
+                const bladeMat = new THREE.MeshStandardMaterial({
+                    color: m.isCW ? 0x38bdf8 : 0xfb7185,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+
+                // 兩片具有迎角(Pitch Angle)的槳葉
+                for (let b = 0; b < 2; b++) {
+                    const bladeGeo = new THREE.BoxGeometry(0.95, 0.02, 0.16);
+                    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                    blade.position.x = (b === 0 ? 0.45 : -0.45);
+                    // 正槳與反槳的攻角傾斜方向相反，才能在各自旋轉方向下都向下壓氣流
+                    const pitchAngle = (m.isCW ? 1 : -1) * (b === 0 ? 0.28 : -0.28);
+                    blade.rotation.x = pitchAngle;
+                    propGroup.add(blade);
+                }
+
+                // 槳帽
+                const hubGeo = new THREE.ConeGeometry(0.11, 0.16, 16);
+                const hub = new THREE.Mesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                hub.position.y = 0.05;
+                propGroup.add(hub);
+
+                mainDrone.add(propGroup);
+                propBlades.push({ group: propGroup, isCW: m.isCW, baseSpeed: 1.0, index: idx });
+
+                // 旋轉方向發光光環
+                const ringGeo = new THREE.RingGeometry(0.98, 1.06, 32, 1, 0, Math.PI * 1.65);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: motorColor,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.75
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2;
+                ring.position.set(m.x, 0.32, m.z);
+                mainDrone.add(ring);
+                torqueArrows.push({ mesh: ring, isCW: m.isCW });
+
+                // 下洗氣流粒子束 (Downwash Airflow)
+                const streamGroup = new THREE.Group();
+                streamGroup.position.set(m.x, 0.1, m.z);
+                for (let p = 0; p < 5; p++) {
+                    const pGeo = new THREE.RingGeometry(0.25 + p * 0.08, 0.29 + p * 0.08, 16);
+                    const pMat = new THREE.MeshBasicMaterial({
+                        color: motorColor,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.5 - p * 0.08
+                    });
+                    const pMesh = new THREE.Mesh(pGeo, pMat);
+                    pMesh.rotation.x = Math.PI / 2;
+                    pMesh.position.y = -p * 0.35;
+                    streamGroup.add(pMesh);
+                }
+                mainDrone.add(streamGroup);
+                airflowParticles.push(streamGroup);
+            });
+        }
+
+        // ==========================================
+        // 單元 2 模型：編程、群飛、FPV 競速、足球預覽
+        // ==========================================
+        function buildSection2Models() {
+            // 1. 編程無人機與 3D 座標路徑
+            codingDrone = createMiniDrone(0x38bdf8, 0.55);
+            groupSection2.add(codingDrone);
+
+            const wpCoords = [
+                new THREE.Vector3(-2.5, -0.5, 1.5),
+                new THREE.Vector3(-2.5, 1.5, -1.5),
+                new THREE.Vector3(2.5, 1.8, -1.5),
+                new THREE.Vector3(2.5, 0.2, 1.5),
+                new THREE.Vector3(-2.5, -0.5, 1.5)
+            ];
+            const pathGeo = new THREE.BufferGeometry().setFromPoints(wpCoords);
+            const pathMat = new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.3, gapSize: 0.15 });
+            codingPathLine = new THREE.Line(pathGeo, pathMat);
+            codingPathLine.computeLineDistances();
+            groupSection2.add(codingPathLine);
+
+            wpCoords.slice(0, 4).forEach((pt) => {
+                const wpMesh = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.22, 0),
+                    new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true })
+                );
+                wpMesh.position.copy(pt);
+                groupSection2.add(wpMesh);
+                codingWaypoints.push(wpMesh);
+            });
+
+            // 2. 群飛無人機編隊 (36 架 LED 無人機)
+            const totalSwarm = 36;
+            for (let i = 0; i < totalSwarm; i++) {
+                const ledGeo = new THREE.SphereGeometry(0.14, 12, 12);
+                const ledMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(i / totalSwarm, 0.9, 0.6) });
+                const ledDrone = new THREE.Mesh(ledGeo, ledMat);
+                ledDrone.visible = false;
+                groupSection2.add(ledDrone);
+                swarmDrones.push({ mesh: ledDrone, index: i, target: new THREE.Vector3() });
+            }
+            updateSwarmTargets('sphere');
+
+            // 3. FPV 穿越機與霓虹拱門賽道
+            fpvDrone = createMiniDrone(0xf43f5e, 0.45);
+            fpvDrone.visible = false;
+            groupSection2.add(fpvDrone);
+
+            const curvePts = [
+                new THREE.Vector3(0, 0.2, 4.5),
+                new THREE.Vector3(4.2, 1.2, 1.5),
+                new THREE.Vector3(2.8, -0.4, -3.5),
+                new THREE.Vector3(-2.8, 1.4, -3.5),
+                new THREE.Vector3(-4.2, 0.0, 1.5)
+            ];
+            fpvTrackCurve = new THREE.CatmullRomCurve3(curvePts, true);
+
+            for (let g = 0; g < 5; g++) {
+                const t = g / 5;
+                const pos = fpvTrackCurve.getPointAt(t);
+                const tangent = fpvTrackCurve.getTangentAt(t);
+                const gateGeo = new THREE.TorusGeometry(0.95, 0.07, 12, 32);
+                const gateMat = new THREE.MeshBasicMaterial({ color: g % 2 === 0 ? 0xf43f5e : 0x0ea5e9 });
+                const gate = new THREE.Mesh(gateGeo, gateMat);
+                gate.position.copy(pos);
+                gate.lookAt(pos.clone().add(tangent));
+                gate.visible = false;
+                groupSection2.add(gate);
+                fpvGates.push(gate);
+            }
+
+            // 4. 衍生活動中的無人機足球對抗預覽
+            for (let s = 0; s < 2; s++) {
+                const sBall = createSoccerDroneMesh(s === 0 ? 0xef4444 : 0x3b82f6, 0.65);
+                sBall.visible = false;
+                groupSection2.add(sBall);
+                previewSoccerBalls.push(sBall);
+            }
+        }
+
+        // ==========================================
+        // 單元 3 模型：6m x 3m x 3m 標準場地與 200mm 無人機足球
+        // ==========================================
+        function buildSection3Models() {
+            // 場地比例：1 unit = 1 meter -> 長 6m (X: -3 ~ +3), 寬 3m (Z: -1.5 ~ +1.5), 高 3m (Y: -1.5 ~ +1.5)
+            const arenaGroup = new THREE.Group();
+            groupSection3.add(arenaGroup);
+
+            // 6m x 3m x 3m 外框骨架
+            const cageGeo = new THREE.BoxGeometry(6, 3, 3);
+            const cageEdges = new THREE.EdgesGeometry(cageGeo);
+            const cageLine = new THREE.LineSegments(
+                cageEdges,
+                new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 })
+            );
+            arenaGroup.add(cageLine);
+
+            // 半透明防護網面材質
+            const netMat = new THREE.MeshBasicMaterial({
+                color: 0x0ea5e9,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.12
+            });
+            const netMesh = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 3, 12, 6, 6), netMat);
+            arenaGroup.add(netMesh);
+
+            // 球場地面與中場線
+            const floorGeo = new THREE.PlaneGeometry(6, 3);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.7,
+                metalness: 0.2,
+                side: THREE.DoubleSide
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = Math.PI / 2;
+            floor.position.y = -1.49;
+            arenaGroup.add(floor);
+
+            // 中場圓環標線
+            const centerCircle = new THREE.Mesh(
+                new THREE.RingGeometry(0.55, 0.6, 32),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+            );
+            centerCircle.rotation.x = Math.PI / 2;
+            centerCircle.position.y = -1.48;
+            arenaGroup.add(centerCircle);
+
+            // 兩側懸空圓環龍門（魁地奇靈感設計）
+            // 右側得分龍門 (X = +2.2m)
+            goalRingRight = new THREE.Group();
+            goalRingRight.position.set(2.2, 0.1, 0);
+            const torusGold = new THREE.Mesh(
+                new THREE.TorusGeometry(0.58, 0.065, 16, 40),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xd97706, emissiveIntensity: 0.5, metalness: 0.8, roughness: 0.2 })
+            );
+            torusGold.rotation.y = Math.PI / 2;
+            goalRingRight.add(torusGold);
+
+            // 龍門懸掛支架
+            const poleRight = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.03, 0.03, 0.9),
+                new THREE.MeshBasicMaterial({ color: 0x94a3b8 })
+            );
+            poleRight.position.y = 0.98;
+            goalRingRight.add(poleRight);
+            arenaGroup.add(goalRingRight);
+
+            // 左側龍門 (X = -2.2m)
+            goalRingLeft = goalRingRight.clone();
+            goalRingLeft.position.set(-2.2, 0.1, 0);
+            arenaGroup.add(goalRingLeft);
+
+            // 建立玩家操控的 200mm 紅色前鋒無人機足球 (為了在 6m 場地中清晰可見並好操控，視覺放大呈現)
+            playerSoccerDrone = createSoccerDroneMesh(0xef4444, 0.36);
+            playerSoccerDrone.position.set(-1.5, 0.1, 0);
+            groupSection3.add(playerSoccerDrone);
+
+            // 兩台藍隊防守無人機足球 (自動巡邏攔截)
+            defenderDrone1 = createSoccerDroneMesh(0x3b82f6, 0.36);
+            defenderDrone1.position.set(0.8, 0.3, -0.6);
+            groupSection3.add(defenderDrone1);
+
+            defenderDrone2 = createSoccerDroneMesh(0x3b82f6, 0.36);
+            defenderDrone2.position.set(1.2, -0.2, 0.6);
+            groupSection3.add(defenderDrone2);
+
+            // 建立「200mm 特寫解剖模型」（切換至特寫時放大檢視）
+            closeupSoccerDrone = createSoccerDroneMesh(0x10b981, 1.35);
+            closeupSoccerDrone.position.set(0, 0.2, 0);
+            closeupSoccerDrone.visible = false;
+            groupSection3.add(closeupSoccerDrone);
+        }
+
+        // 建立 200mm 球型保護籠無人機足球共用函數
+        function createSoccerDroneMesh(teamColorHex, radius) {
+            const droneBallGroup = new THREE.Group();
+
+            // 1. 外部二十面體碳纖防撞保護球籠 (Geodesic Cage)
+            const outerCageGeo = new THREE.IcosahedronGeometry(radius, 1);
+            const outerCageMat = new THREE.MeshStandardMaterial({
+                color: 0xf8fafc,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.75
+            });
+            const outerCage = new THREE.Mesh(outerCageGeo, outerCageMat);
+            droneBallGroup.add(outerCage);
+
+            // 2. 三軸加強防撞環 (赤道環 + 經線環)
+            const ringMat = new THREE.MeshBasicMaterial({ color: teamColorHex, side: THREE.DoubleSide });
+            for (let r = 0; r < 3; r++) {
+                const band = new THREE.Mesh(new THREE.TorusGeometry(radius, radius * 0.035, 10, 36), ringMat);
+                if (r === 1) band.rotation.x = Math.PI / 2;
+                if (r === 2) band.rotation.y = Math.PI / 2;
+                droneBallGroup.add(band);
+            }
+
+            // 3. 內部核心四軸無人機與高速保護扇葉
+            const innerDrone = createMiniDrone(teamColorHex, radius * 0.55);
+            droneBallGroup.add(innerDrone);
+            droneBallGroup.userData = { innerDrone: innerDrone, radius: radius };
+
+            return droneBallGroup;
+        }
+
+        // 建立輕量四軸無人機模型共用函數
+        function createMiniDrone(colorHex, scale) {
+            const g = new THREE.Group();
+            const core = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6 * scale, 0.18 * scale, 0.8 * scale),
+                new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.5, roughness: 0.3 })
+            );
+            g.add(core);
+
+            const armOffsets = [
+                [-0.5 * scale, -0.5 * scale],
+                [ 0.5 * scale, -0.5 * scale],
+                [-0.5 * scale,  0.5 * scale],
+                [ 0.5 * scale,  0.5 * scale]
+            ];
+            const props = [];
+            armOffsets.forEach(([ox, oz]) => {
+                const rotor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.28 * scale, 0.28 * scale, 0.03 * scale, 12),
+                    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 })
+                );
+                rotor.position.set(ox, 0.12 * scale, oz);
+                g.add(rotor);
+                props.push(rotor);
+            });
+            g.userData.props = props;
+            return g;
+        }
+
+        // ==========================================
+        // 互動切換邏輯：單元 1、單元 2、單元 3
+        // ==========================================
+        function switchSection(sec) {
+            currentSection = sec;
+            fpvCamActive = false;
+
+            // 更新頂部按鈕樣式
+            [1, 2, 3].forEach(i => {
+                const btn = document.getElementById(`tab-btn-${i}`);
+                const panel = document.getElementById(`section-${i}`);
+                if (i === sec) {
+                    btn.className = "tab-active px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold flex items-center gap-2 transition-all";
+                    panel.classList.remove('hidden');
+                } else {
+                    btn.className = "px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 flex items-center gap-2 transition-all";
+                    panel.classList.add('hidden');
+                }
+            });
+
+            // 切換 3D 群組可見度與預設相機角度
+            groupSection1.visible = (sec === 1);
+            groupSection2.visible = (sec === 2);
+            groupSection3.visible = (sec === 3);
+
+            // 切換浮動 3D 標籤
+            ['label-m0', 'label-m1', 'label-m2', 'label-m3'].forEach(id => {
+                document.getElementById(id).style.display = (sec === 1) ? 'block' : 'none';
+            });
+            document.getElementById('label-cage-dim').style.display = (sec === 3 && soccerViewMode === 'arena') ? 'block' : 'none';
+            document.getElementById('label-ball-dim').style.display = (sec === 3) ? 'block' : 'none';
+
+            if (sec === 1) {
+                targetCamTheta = 0.65;
+                targetCamPhi = 1.05;
+                targetCamRadius = 5.8;
+                targetLookAt.set(0, 0.2, 0);
+            } else if (sec === 2) {
+                targetCamTheta = 0.4;
+                targetCamPhi = 1.1;
+                targetCamRadius = 8.5;
+                targetLookAt.set(0, 0.4, 0);
+            } else if (sec === 3) {
+                setSoccerView(soccerViewMode);
+            }
+        }
+
+        // 單元 1：切換正反槳飛行物理狀態
+        function setPhysicsState(state) {
+            physicsState = state;
+            const btns = {
+                hover: 'btn-phys-hover',
+                ascend: 'btn-phys-ascend',
+                pitch: 'btn-phys-pitch',
+                yaw: 'btn-phys-yaw'
+            };
+            Object.keys(btns).forEach(k => {
+                const el = document.getElementById(btns[k]);
+                if (k === state) {
+                    el.className = "btn-action bg-sky-600/50 border border-sky-400 text-white rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5";
+                } else {
+                    el.className = "btn-action bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-xl py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5";
+                }
+            });
+
+            const badge = document.getElementById('physics-status-badge');
+            const descShort = document.getElementById('physics-desc-short');
+            const rpmCw = document.getElementById('rpm-cw');
+            const rpmCcw = document.getElementById('rpm-ccw');
+            const barCw = document.getElementById('bar-cw');
+            const barCcw = document.getElementById('bar-ccw');
+
+            if (state === 'hover') {
+                badge.textContent = "扭力平衡：穩定懸停";
+                badge.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40";
+                descShort.textContent = "正反槳轉速相同，淨扭矩 = 0";
+                rpmCw.textContent = "5000 RPM"; rpmCcw.textContent = "5000 RPM";
+                barCw.style.width = "50%"; barCcw.style.width = "50%";
+            } else if (state === 'ascend') {
+                badge.textContent = "垂直上升：全槳加速";
+                badge.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/40";
+                descShort.textContent = "總升力 > 重力，保持扭力平衡";
+                rpmCw.textContent = "8500 RPM"; rpmCcw.textContent = "8500 RPM";
+                barCw.style.width = "85%"; barCcw.style.width = "85%";
+            } else if (state === 'pitch') {
+                badge.textContent = "俯仰前進：後排加速";
+                badge.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/40";
+                descShort.textContent = "M3、M4 加速使機頭前傾推進";
+                rpmCw.textContent = "前4000 / 後7800"; rpmCcw.textContent = "前4000 / 後7800";
+                barCw.style.width = "68%"; barCcw.style.width = "68%";
+            } else if (state === 'yaw') {
+                badge.textContent = "偏航轉向：正槳加速";
+                badge.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40";
+                descShort.textContent = "正反槳轉速差產生反扭力差轉向";
+                rpmCw.textContent = "8200 RPM"; rpmCcw.textContent = "3200 RPM";
+                barCw.style.width = "82%"; barCcw.style.width = "32%";
+            } else if (state === 'all_cw') {
+                badge.textContent = "警告：無反槳抵消反扭力！";
+                badge.className = "text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-500/30 text-rose-300 border border-rose-400";
+                descShort.textContent = "4 槳皆順時針，機身劇烈逆時針失控自旋！";
+                rpmCw.textContent = "7500 RPM (全正槳)"; rpmCcw.textContent = "0 RPM (無反槳)";
+                barCw.style.width = "100%"; barCcw.style.width = "0%";
+            }
+        }
+
+        // 單元 2：切換衍生無人機活動
+        function setActivityMode(mode) {
+            activityMode = mode;
+            fpvCamActive = false;
+
+            const btnMap = {
+                coding: 'btn-act-coding',
+                swarm: 'btn-act-swarm',
+                fpv: 'btn-act-fpv',
+                soccer_preview: 'btn-act-soccer'
+            };
+            Object.keys(btnMap).forEach(k => {
+                const el = document.getElementById(btnMap[k]);
+                if (k === mode) {
+                    el.className = "btn-action bg-sky-600/40 border border-sky-400 text-white rounded-xl p-3 text-left space-y-1";
+                } else {
+                    el.className = "btn-action bg-slate-800/80 border border-slate-700 text-slate-200 rounded-xl p-3 text-left space-y-1";
+                }
+            });
+
+            // 切換 3D 物件可見度
+            codingDrone.visible = (mode === 'coding');
+            codingPathLine.visible = (mode === 'coding');
+            codingWaypoints.forEach(w => w.visible = (mode === 'coding'));
+            swarmDrones.forEach(d => d.mesh.visible = (mode === 'swarm'));
+            fpvDrone.visible = (mode === 'fpv');
+            fpvGates.forEach(g => g.visible = (mode === 'fpv'));
+            previewSoccerBalls.forEach(b => b.visible = (mode === 'soccer_preview'));
+
+            // 附屬按鈕顯示
+            document.getElementById('sub-control-swarm').classList.toggle('hidden', mode !== 'swarm');
+            document.getElementById('sub-control-fpv').classList.toggle('hidden', mode !== 'fpv');
+            document.getElementById('act-extra-box').classList.toggle('hidden', mode !== 'coding');
+
+            // 更新文字內容
+            const tag = document.getElementById('act-tag');
+            const title = document.getElementById('act-title');
+            const desc = document.getElementById('act-desc');
+            const high = document.getElementById('act-highlights');
+
+            if (mode === 'coding') {
+                tag.textContent = "STEAM 運算思維";
+                title.textContent = "1. 無人機編程 (Drone Coding)";
+                desc.textContent = "透過積木編程（Scratch / Blockly）或 Python 語言，學生無需手控搖桿，而是編寫演算法控制無人機自動起飛、按三維座標（X, Y, Z）精準巡航、定點懸停及任務降落。結合室內光流定位與飛行時間測距（ToF）感測器，訓練空間幾何與邏輯除錯能力。";
+                high.innerHTML = `<div><strong class="text-sky-300">核心技術：</strong>Python SDK、光流定位感測、PID 姿態控制</div>
+                                  <div><strong class="text-emerald-300">學習重點：</strong>三維笛卡兒座標系、迴圈與條件判斷、自動化路徑規劃</div>`;
+            } else if (mode === 'swarm') {
+                tag.textContent = "RTK 高精度協同控制";
+                title.textContent = "2. 無人機群飛展演 (Drone Swarm)";
+                desc.textContent = "由數十至數千架配備全彩 LED 燈的無人機組成空中編隊。透過地面主控電腦預先設計 3D 舞步動畫，結合 RTK 厘米級衛星定位（室外）或 UWB 超寬頻定位（室內），讓每架無人機在三維空間中同步變換球體、雙螺旋或文字圖案。";
+                high.innerHTML = `<div><strong class="text-purple-300">核心技術：</strong>RTK 差分定位、UWB 室內定位、防碰撞群體演算法</div>
+                                  <div><strong class="text-emerald-300">應用場景：</strong>大型節慶夜空燈光秀、品牌立體圖騰展演、協同搜救</div>`;
+            } else if (mode === 'fpv') {
+                tag.textContent = "沉浸式高速競速";
+                title.textContent = "3. FPV 第一人稱穿越競速 (FPV Racing)";
+                desc.textContent = "FPV（First Person View）飛行員配戴專用飛行眼鏡，即時接收無人機機頭鏡頭傳回的低延遲畫面，猶如親自坐在駕駛艙內！競速穿越機推重比極高，時速可突破 150 km/h，能在複雜的霓虹障礙拱門間做出急轉彎與翻滾特技。";
+                high.innerHTML = `<div><strong class="text-rose-300">核心技術：</strong>毫秒級圖傳系統、手動模式（Acro Mode）無自穩操控</div>
+                                  <div><strong class="text-emerald-300">延伸應用：</strong>極限體育賽事、電影一鏡到底穿梭航拍、狹窄空間搜救</div>`;
+            } else if (mode === 'soccer_preview') {
+                tag.textContent = "安全防撞團體電競";
+                title.textContent = "4. 無人機足球 (Drone Soccer)";
+                desc.textContent = "將無人機裝入高韌性球型防撞保護籠內，結合航空操控與足球戰術的團體電子競技運動！可點擊上方導覽列「3. 無人機足球」進入 6m × 3m × 3m 標準球場親自試玩射門！";
+                high.innerHTML = `<div><strong class="text-amber-300">核心特色：</strong>200mm / 400mm 球型保護框、空中碰撞不傷螺旋槳</div>
+                                  <div><strong class="text-emerald-300">團隊分工：</strong>每隊由前鋒（Striker）負責穿環得分，後衛負責攔截防守</div>`;
+            }
+        }
+
+        // 更新群飛目標位置
+        function setSwarmShape(shape) {
+            swarmShape = shape;
+            updateSwarmTargets(shape);
+        }
+
+        function updateSwarmTargets(shape) {
+            const n = swarmDrones.length;
+            swarmDrones.forEach((d, i) => {
+                if (shape === 'sphere') {
+                    const phi = Math.acos(-1 + (2 * i) / n);
+                    const theta = Math.sqrt(n * Math.PI) * phi;
+                    d.target.set(
+                        2.2 * Math.cos(theta) * Math.sin(phi),
+                        2.2 * Math.sin(theta) * Math.sin(phi) + 0.5,
+                        2.2 * Math.cos(phi)
+                    );
+                } else if (shape === 'dna') {
+                    const strand = i % 2 === 0 ? 1 : -1;
+                    const idx = Math.floor(i / 2);
+                    const angle = idx * 0.45;
+                    d.target.set(
+                        (idx - 8.5) * 0.35,
+                        Math.sin(angle) * 1.3 * strand + 0.5,
+                        Math.cos(angle) * 1.3 * strand
+                    );
+                } else if (shape === 'star') {
+                    const angle = (i / n) * Math.PI * 2;
+                    const r = (i % 2 === 0) ? 2.8 : 1.3;
+                    d.target.set(
+                        Math.cos(angle) * r,
+                        Math.sin(angle * 3) * 0.6 + 0.5,
+                        Math.sin(angle) * r
+                    );
+                }
+            });
+        }
+
+        function toggleFpvCamera() {
+            fpvCamActive = !fpvCamActive;
+            const btn = document.getElementById('btn-fpv-cam');
+            if (fpvCamActive) {
+                btn.innerHTML = `<i class="ph-bold ph-eye"></i> 返回第三人稱全景視角`;
+                btn.className = "px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5 shadow";
+            } else {
+                btn.innerHTML = `<i class="ph-bold ph-video-camera"></i> 切換 FPV 第一人稱視角`;
+                btn.className = "px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow";
+            }
+        }
+
+        // 單元 3：切換全景球場與 200mm 特寫
+        function setSoccerView(view) {
+            soccerViewMode = view;
+            const btnArena = document.getElementById('btn-view-arena');
+            const btnClose = document.getElementById('btn-view-closeup');
+
+            if (view === 'arena') {
+                btnArena.className = "flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600/50 border border-sky-400 text-xs font-bold text-white flex items-center justify-center gap-1";
+                btnClose.className = "flex-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 flex items-center justify-center gap-1";
+                closeupSoccerDrone.visible = false;
+                playerSoccerDrone.visible = true;
+                defenderDrone1.visible = true;
+                defenderDrone2.visible = true;
+                document.getElementById('label-cage-dim').style.display = 'block';
+
+                targetCamTheta = 0.25;
+                targetCamPhi = 1.15;
+                targetCamRadius = 7.4;
+                targetLookAt.set(0, 0, 0);
+            } else {
+                btnClose.className = "flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-600/50 border border-emerald-400 text-xs font-bold text-white flex items-center justify-center gap-1";
+                btnArena.className = "flex-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 flex items-center justify-center gap-1";
+                closeupSoccerDrone.visible = true;
+                playerSoccerDrone.visible = false;
+                defenderDrone1.visible = false;
+                defenderDrone2.visible = false;
+                document.getElementById('label-cage-dim').style.display = 'none';
+
+                targetCamTheta = 0.6;
+                targetCamPhi = 1.25;
+                targetCamRadius = 3.6;
+                targetLookAt.set(0, 0.2, 0);
+            }
+        }
+
+        // 無人機足球控制與一鍵射門
+        function startMove(dir) {
+            if (soccerViewMode === 'closeup') setSoccerView('arena');
+            autoGoalActive = false;
+            moveState[dir] = true;
+        }
+        function stopMove(dir) {
+            moveState[dir] = false;
+        }
+        function resetSoccerBall() {
+            autoGoalActive = false;
+            playerVelocity.set(0, 0, 0);
+            playerSoccerDrone.position.set(-1.8, 0.1, 0);
+            playerSoccerDrone.rotation.set(0, 0, 0);
+        }
+        function triggerAutoGoalDemo() {
+            if (soccerViewMode === 'closeup') setSoccerView('arena');
+            resetSoccerBall();
+            autoGoalActive = true;
+            autoGoalProgress = 0;
+        }
+
+        function celebrateGoal() {
+            soccerScore += 10;
+            document.getElementById('soccer-score').textContent = soccerScore;
+            const banner = document.getElementById('goal-banner');
+            banner.classList.remove('hidden');
+            setTimeout(() => {
+                banner.classList.add('hidden');
+            }, 2200);
+        }
+
+        // ==========================================
+        // 事件監聽 (滑鼠拖曳旋轉視角、滾輪縮放、鍵盤操控)
+        // ==========================================
+        function setupInteractionEvents() {
+            const dom = renderer.domElement;
+
+            dom.addEventListener('pointerdown', (e) => {
+                isPointerDown = true;
+                pointerX = e.clientX;
+                pointerY = e.clientY;
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                if (!isPointerDown) return;
+                const dx = e.clientX - pointerX;
+                const dy = e.clientY - pointerY;
+                pointerX = e.clientX;
+                pointerY = e.clientY;
+
+                targetCamTheta -= dx * 0.007;
+                targetCamPhi = Math.max(0.25, Math.min(Math.PI / 2 + 0.15, targetCamPhi - dy * 0.007));
+            });
+
+            window.addEventListener('pointerup', () => {
+                isPointerDown = false;
+            });
+
+            dom.addEventListener('wheel', (e) => {
+                targetCamRadius = Math.max(2.6, Math.min(14, targetCamRadius + e.deltaY * 0.004));
+            }, { passive: true });
+
+            // 鍵盤操控無人機足球 (WASD + 方向鍵)
+            window.addEventListener('keydown', (e) => {
+                if (currentSection !== 3) return;
+                const k = e.key.toLowerCase();
+                if (k === 'w') startMove('up');
+                if (k === 's') startMove('down');
+                if (k === 'arrowup') startMove('forward');
+                if (k === 'arrowdown') startMove('backward');
+                if (k === 'arrowleft') startMove('left');
+                if (k === 'arrowright') startMove('right');
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (k === 'w') stopMove('up');
+                if (k === 's') stopMove('down');
+                if (k === 'arrowup') stopMove('forward');
+                if (k === 'arrowdown') stopMove('backward');
+                if (k === 'arrowleft') stopMove('left');
+                if (k === 'arrowright') stopMove('right');
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // 將 3D 世界座標轉換為 2D 螢幕像素座標以定位 HTML 標籤
+        function updateFloatingLabel(elementId, worldPosVec3) {
+            const el = document.getElementById(elementId);
+            if (!el || el.style.display === 'none') return;
+
+            const projected = worldPosVec3.clone().project(camera);
+            if (projected.z > 1) {
+                el.style.opacity = '0';
+                return;
+            }
+            const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+            el.style.opacity = '1';
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+        }
+
+        // ==========================================
+        // 主動畫迴圈 (Animation Loop)
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+            const elapsed = clock.getElapsedTime();
+
+            // 1. 更新相機軌道平滑過渡 (除非處於 FPV 第一人稱模式)
+            if (!(currentSection === 2 && activityMode === 'fpv' && fpvCamActive)) {
+                camTheta += (targetCamTheta - camTheta) * 0.08;
+                camPhi += (targetCamPhi - camPhi) * 0.08;
+                camRadius += (targetCamRadius - camRadius) * 0.08;
+                camLookAt.lerp(targetLookAt, 0.08);
+
+                camera.position.x = camLookAt.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+                camera.position.y = camLookAt.y + camRadius * Math.cos(camPhi);
+                camera.position.z = camLookAt.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+                camera.lookAt(camLookAt);
+            }
+
+            // ------------------------------------------
+            // 單元 1 動畫：飛行原理與正反槳轉速模擬
+            // ------------------------------------------
+            if (currentSection === 1) {
+                let targetY = Math.sin(elapsed * 2.2) * 0.12 + 0.2;
+                let targetPitch = 0;
+                let yawRate = 0;
+
+                if (physicsState === 'ascend') {
+                    targetY = 1.05 + Math.sin(elapsed * 3) * 0.1;
+                } else if (physicsState === 'pitch') {
+                    targetPitch = -0.28; // 機頭前傾
+                } else if (physicsState === 'yaw') {
+                    yawRate = 1.6;       // 穩定偏航轉向
+                } else if (physicsState === 'all_cw') {
+                    yawRate = 9.5;       // 全裝正槳：劇烈失控逆時針自旋！
+                    targetPitch = Math.sin(elapsed * 8) * 0.18;
+                }
+
+                mainDrone.position.y += (targetY - mainDrone.position.y) * 0.08;
+                mainDrone.rotation.x += (targetPitch - mainDrone.rotation.x) * 0.08;
+                if (yawRate !== 0) {
+                    mainDrone.rotation.y += yawRate * dt;
+                } else {
+                    mainDrone.rotation.y += (0 - mainDrone.rotation.y) * 0.06;
+                }
+
+                // 旋轉四片螺旋槳並更新下洗氣流
+                propBlades.forEach((p, idx) => {
+                    let speedMult = 18;
+                    if (physicsState === 'ascend') speedMult = 32;
+                    if (physicsState === 'pitch') speedMult = (idx >= 2) ? 30 : 12; // 後排加速
+                    if (physicsState === 'yaw') speedMult = p.isCW ? 30 : 9;
+
+                    // 若處於「全裝正槳」實驗，所有螺旋槳都順時針轉 (CW: -1)
+                    const dir = (physicsState === 'all_cw') ? -1 : (p.isCW ? -1 : 1);
+                    p.group.rotation.y += dir * speedMult * dt;
+
+                    // 氣流向下流動視覺
+                    const stream = airflowParticles[idx];
+                    stream.children.forEach((ring, rIdx) => {
+                        ring.position.y -= dt * (speedMult * 0.12);
+                        if (ring.position.y < -1.6) ring.position.y = 0;
+                    });
+                });
+
+                // 更新四個馬達的 3D 浮動標籤位置
+                motorPositions.forEach((m, idx) => {
+                    const localVec = new THREE.Vector3(m.x, 0.72, m.z);
+                    localVec.applyMatrix4(mainDrone.matrixWorld);
+                    updateFloatingLabel(`label-m${idx}`, localVec);
+                });
+            }
+
+            // ------------------------------------------
+            // 單元 2 動畫：編程、群飛、FPV 競速、足球預覽
+            // ------------------------------------------
+            if (currentSection === 2) {
+                if (activityMode === 'coding') {
+                    // 沿著四角座標巡航
+                    const speed = 0.25;
+                    const t = (elapsed * speed) % 4;
+                    const seg = Math.floor(t);
+                    const frac = t - seg;
+                    const p1 = codingWaypoints[seg].position;
+                    const p2 = codingWaypoints[(seg + 1) % 4].position;
+                    codingDrone.position.lerpVectors(p1, p2, frac);
+                    codingDrone.position.y += Math.sin(elapsed * 6) * 0.03;
+                    codingWaypoints.forEach(w => w.rotation.y += dt * 1.5);
+                } else if (activityMode === 'swarm') {
+                    // 36 架無人機平滑飛向目標編隊座標並旋轉展示
+                    swarmDrones.forEach((d, i) => {
+                        const rotatedTarget = d.target.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), elapsed * 0.45);
+                        d.mesh.position.lerp(rotatedTarget, 0.06);
+                    });
+                } else if (activityMode === 'fpv') {
+                    // 高速沿賽道曲線穿梭拱門
+                    const loopT = (elapsed * 0.16) % 1;
+                    const pos = fpvTrackCurve.getPointAt(loopT);
+                    const lookAheadPos = fpvTrackCurve.getPointAt((loopT + 0.03) % 1);
+                    fpvDrone.position.copy(pos);
+                    fpvDrone.lookAt(lookAheadPos);
+
+                    if (fpvCamActive) {
+                        const camOffset = pos.clone().add(new THREE.Vector3(0, 0.15, 0));
+                        camera.position.copy(camOffset);
+                        camera.lookAt(lookAheadPos);
+                    }
+                } else if (activityMode === 'soccer_preview') {
+                    // 兩顆無人機足球空中碰撞示範
+                    const bounce = Math.abs(Math.sin(elapsed * 3.2)) * 1.4 + 0.65;
+                    previewSoccerBalls[0].position.set(-bounce, 0.5 + Math.sin(elapsed * 4) * 0.2, 0);
+                    previewSoccerBalls[1].position.set(bounce, 0.5 + Math.cos(elapsed * 4) * 0.2, 0);
+                    previewSoccerBalls[0].rotation.z = elapsed * 1.5;
+                    previewSoccerBalls[1].rotation.z = -elapsed * 1.5;
+                }
+            }
+
+            // ------------------------------------------
+            // 單元 3 動畫：無人機足球 (6m x 3m x 3m 場地與 200mm 球框)
+            // ------------------------------------------
+            if (currentSection === 3) {
+                if (soccerViewMode === 'closeup') {
+                    closeupSoccerDrone.rotation.y = elapsed * 0.5;
+                    closeupSoccerDrone.rotation.x = Math.sin(elapsed * 0.8) * 0.2;
+                    if (closeupSoccerDrone.userData.innerDrone) {
+                        closeupSoccerDrone.userData.innerDrone.userData.props.forEach(r => r.rotation.y += dt * 25);
+                    }
+                    updateFloatingLabel('label-ball-dim', new THREE.Vector3(0, 1.75, 0));
+                } else {
+                    // 兩架藍隊防守無人機自動上下左右巡邏攔截
+                    defenderDrone1.position.y = Math.sin(elapsed * 2.2) * 0.75;
+                    defenderDrone1.position.z = Math.cos(elapsed * 1.6) * 0.75;
+                    defenderDrone2.position.y = Math.cos(elapsed * 2.0) * 0.75;
+                    defenderDrone2.position.z = Math.sin(elapsed * 1.8) * 0.75;
+
+                    // 一鍵自動穿環射門示範或手動操控
+                    if (autoGoalActive) {
+                        autoGoalProgress += dt * 0.75;
+                        const startX = -1.8;
+                        const endX = 2.65;
+                        playerSoccerDrone.position.x = THREE.MathUtils.lerp(startX, endX, Math.min(autoGoalProgress, 1));
+                        // 閃避防守隊員並對準右側圓環中心 (Y=0.1, Z=0)
+                        playerSoccerDrone.position.y = 0.1 + Math.sin(autoGoalProgress * Math.PI * 2) * 0.35 * (1 - Math.min(autoGoalProgress, 1));
+                        playerSoccerDrone.position.z = Math.sin(autoGoalProgress * Math.PI) * 0.65 * (1 - Math.min(autoGoalProgress, 1));
+                        playerSoccerDrone.rotation.z = -0.3;
+
+                        if (autoGoalProgress >= 1.05) {
+                            autoGoalActive = false;
+                            setTimeout(resetSoccerBall, 600);
+                        }
+                    } else {
+                        // 玩家手動控制移動 (X軸為前後攻防方向，Z軸為左右，Y軸為升降)
+                        const accel = 4.5;
+                        if (moveState.forward)  playerVelocity.x += accel * dt;
+                        if (moveState.backward) playerVelocity.x -= accel * dt;
+                        if (moveState.left)     playerVelocity.z -= accel * dt;
+                        if (moveState.right)    playerVelocity.z += accel * dt;
+                        if (moveState.up)       playerVelocity.y += accel * dt;
+                        if (moveState.down)     playerVelocity.y -= accel * dt;
+
+                        // 空氣阻力衰減
+                        playerVelocity.multiplyScalar(0.92);
+                        playerSoccerDrone.position.addScaledVector(playerVelocity, dt);
+
+                        // 傾角視覺回饋
+                        playerSoccerDrone.rotation.z = -playerVelocity.x * 0.12;
+                        playerSoccerDrone.rotation.x = playerVelocity.z * 0.12;
+
+                        // 6m x 3m x 3m 安全網籠邊界碰撞反彈限制
+                        const r = 0.36;
+                        if (playerSoccerDrone.position.x > 3 - r)  { playerSoccerDrone.position.x = 3 - r;  playerVelocity.x *= -0.6; }
+                        if (playerSoccerDrone.position.x < -3 + r) { playerSoccerDrone.position.x = -3 + r; playerVelocity.x *= -0.6; }
+                        if (playerSoccerDrone.position.y > 1.5 - r){ playerSoccerDrone.position.y = 1.5 - r;playerVelocity.y *= -0.6; }
+                        if (playerSoccerDrone.position.y < -1.5 + r){playerSoccerDrone.position.y = -1.5 + r;playerVelocity.y *= -0.6; }
+                        if (playerSoccerDrone.position.z > 1.5 - r){ playerSoccerDrone.position.z = 1.5 - r;playerVelocity.z *= -0.6; }
+                        if (playerSoccerDrone.position.z < -1.5 + r){playerSoccerDrone.position.z = -1.5 + r;playerVelocity.z *= -0.6; }
+
+                        // 與防守無人機的球框彈性碰撞檢測
+                        [defenderDrone1, defenderDrone2].forEach(def => {
+                            const dist = playerSoccerDrone.position.distanceTo(def.position);
+                            if (dist < 0.72) {
+                                const pushDir = playerSoccerDrone.position.clone().sub(def.position).normalize();
+                                playerVelocity.addScaledVector(pushDir, 3.2);
+                            }
+                        });
+                    }
+
+                    // 檢測是否穿過右側黃金龍門 (X 約在 2.1 ~ 2.3，且與圓心 Y=0.1, Z=0 距離 < 0.48)
+                    if (goalCooldown > 0) goalCooldown -= dt;
+                    const distToGoalCenter = Math.hypot(playerSoccerDrone.position.y - 0.1, playerSoccerDrone.position.z - 0);
+                    if (Math.abs(playerSoccerDrone.position.x - 2.2) < 0.18 && distToGoalCenter < 0.48 && goalCooldown <= 0) {
+                        goalCooldown = 2.0;
+                        celebrateGoal();
+                    }
+
+                    // 更新場地與球體 3D 標籤位置
+                    updateFloatingLabel('label-cage-dim', new THREE.Vector3(0, 1.75, 0));
+                    updateFloatingLabel('label-ball-dim', playerSoccerDrone.position.clone().add(new THREE.Vector3(0, 0.58, 0)));
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // 啟動應用程式
+        window.onload = function () {
+            initThreeScene();
+            animate();
+        };
+    </script>
+</body>
+</html>

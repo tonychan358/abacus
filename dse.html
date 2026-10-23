@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSE 四面體：辨認交角與幾何推理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MathJax 3 數學公式渲染 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <!-- FontAwesome 圖標庫 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+      overflow-x: hidden;
+    }
+    .badge-mark {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+    .mjx-chtml {
+      font-size: 100% !important;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    @media (max-width: 640px) {
+      .mjx-chtml {
+        font-size: 92% !important;
+      }
+    }
+    canvas {
+      touch-action: none;
+    }
+    .formula-scroll { overflow-x: auto; padding: 4px 0; }
+    .formula-scroll mjx-container[display="true"] { text-align: left !important; }
+    /* 隱藏橫向滑動條但保留滑動功能 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* 自定義捲軸 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- 頂部標題導航 (RWD 優化：手機隱藏副標題，按鈕自適應) -->
+  <header class="bg-indigo-950 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-3 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+        <span class="p-1.5 sm:p-2 bg-indigo-800 rounded-xl text-amber-300 shadow-inner shrink-0">
+          <i aria-hidden="true" class="fa-solid fa-cubes text-lg sm:text-xl"></i>
+        </span>
+        <div class="truncate">
+          <h1 class="text-sm sm:text-base md:text-lg font-bold tracking-wide truncate">DSE 四面體：由辨認交角到幾何推理</h1>
+          <p class="hidden sm:block text-xs text-indigo-300 truncate">卷一 第18題 • 逐步作圖 • 辨認交角 • 數值驗算與幾何證明</p>
+        </div>
+      </div>
+      <div class="flex items-center shrink-0">
+        <button onclick="showFullSolutionModal()" class="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold px-2.5 sm:px-3.5 py-2 rounded-xl shadow transition flex items-center">
+          <i aria-hidden="true" class="fa-solid fa-file-invoice sm:mr-1.5"></i>
+          <span class="hidden sm:inline">完整參考解答</span>
+          <span class="sm:hidden ml-1">解答</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區 (RWD 雙欄網格：手機單欄上下排列，大螢幕左 6 右 6 讓電腦版 3D 視窗更寬大清晰) -->
+  <main class="flex-1 max-w-[1440px] mx-auto w-full px-2.5 py-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+
+    <!-- 左欄：3D 可旋轉縮放視覺圖 + 2D 目標平面拆解視窗 (大螢幕佔 6 欄並 Sticky 固定) -->
+    <div class="lg:col-span-6 lg:sticky lg:top-16 space-y-3 sm:space-y-4">
+      
+      <!-- 原題目卡片 (手機支援折疊切換，節省垂直空間) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div onclick="toggleMobileProblemCard()" class="bg-slate-100 px-3.5 py-2.5 border-b border-slate-200 flex justify-between items-center cursor-pointer sm:cursor-default">
+          <span class="font-bold text-slate-700 flex items-center text-xs sm:text-sm">
+            <i aria-hidden="true" class="fa-regular fa-file-lines text-indigo-600 mr-2"></i> 題目已知條件（全題共 7 分）
+          </span>
+          <div class="flex items-center space-x-2">
+            <span class="badge-mark text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+              DSE 卷一 Q18
+            </span>
+            <button class="sm:hidden text-slate-500 text-xs px-1" aria-label="展開或收起題目">
+              <i id="problemCollapseIcon" class="fa-solid fa-chevron-up"></i>
+            </button>
+          </div>
+        </div>
+        <div id="problemCardBody" class="p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed text-slate-700 space-y-2 bg-gradient-to-b from-white to-slate-50">
+          <p>
+            四面體 $ABCD$ 中，$\triangle BCD$ 的垂心為 $F$。$DF$ 的延線與 $BC$ 相交於點 $E$。
+          </p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-1.5 text-xs font-mono bg-white p-2.5 rounded-xl border border-slate-200 text-slate-800">
+            <div>• $AB = 6\text{ cm}$</div>
+            <div>• $BC = 8\text{ cm}$</div>
+            <div>• $\angle CBD = 70^\circ$</div>
+            <div>• $\angle BDC = 50^\circ$</div>
+            <div>• $\angle ABC = 60^\circ$</div>
+            <div>• $\angle AEF = 55^\circ$</div>
+          </div>
+          <div class="pt-1.5 border-t border-slate-200 text-xs text-slate-600 space-y-1">
+            <p><strong>(a)</strong> 求 $BD$ 及 $BE$。<span class="text-amber-600 font-semibold">(3 分)</span></p>
+            <p><strong>(b)</strong> 某人宣稱 $\triangle ABC$ 與 $\triangle BCD$ 間的交角<strong>不超過 $55^\circ$</strong>。你是否同意？試解釋你的答案。<span class="text-amber-600 font-semibold">(4 分)</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D 自由旋轉幾何視圖 + 平面聚焦控制台 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center space-x-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h2 class="text-xs sm:text-sm font-bold text-slate-800">
+              3D 立體模型（可滾輪縮放 • 360° 旋轉）
+            </h2>
+          </div>
+          <div class="flex items-center flex-wrap gap-1.5">
+            <button id="btnSpread" type="button" onclick="toggleNearPointSpread()" aria-pressed="true" class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white font-bold border border-indigo-600" title="展開主圖中過於接近的點；原始計算座標不變">
+              <span id="spreadModeText">近點展開：開</span>
+            </button>
+            <button id="btnExaggerate" onclick="toggleDetailInset()" class="px-2.5 py-1 text-[11px] rounded-lg bg-amber-500 text-slate-950 font-bold shadow-sm hover:bg-amber-400 active:scale-95 transition flex items-center" title="另開長方形局部示意圖，原始計算座標不變" aria-expanded="false" aria-controls="detailInset">
+              <i aria-hidden="true" class="fa-solid fa-expand mr-1"></i> <span id="exaggerateText">局部放大：關</span>
+            </button>
+            <button id="btnAutoRotate" onclick="toggleAutoRotate()" class="px-2 py-1 text-[11px] rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 border border-slate-300 transition flex items-center">
+              <i aria-hidden="true" class="fa-solid fa-arrows-rotate mr-1 text-indigo-600"></i> <span id="autoRotateText">自動旋轉</span>
+            </button>
+            <button onclick="focusZoomHKGE()" class="px-2 py-1 text-[11px] rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-95 border border-emerald-200 font-semibold transition" title="顯示長方形及局部放大窗，原始計算座標保持不變">
+              <i aria-hidden="true" class="fa-solid fa-magnifying-glass-location mr-1"></i> 特寫 HKGE
+            </button>
+            <button onclick="reset3DView()" class="px-2 py-1 text-[11px] rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 border border-indigo-200 font-semibold transition" title="重設視角，完整顯示模型">
+              <i aria-hidden="true" class="fa-solid fa-file-image mr-1"></i> 重設視角
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-2">
+          <p class="text-xs font-semibold text-slate-700">逐步作圖 <span id="constructionLabel" class="font-normal text-slate-500">原題四面體</span></p>
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-1 text-xs" role="group" aria-label="選擇作圖階段">
+            <button type="button" data-stage="0" onclick="setLessonStage(0)" class="stage-btn rounded-lg border p-2">原圖</button>
+            <button type="button" data-stage="1" onclick="setLessonStage(1)" class="stage-btn rounded-lg border p-2">高線 DE</button>
+            <button type="button" data-stage="2" onclick="setLessonStage(2)" class="stage-btn rounded-lg border p-2">連接 AE</button>
+            <button type="button" data-stage="3" onclick="setLessonStage(3)" class="stage-btn rounded-lg border p-2">作 AH</button>
+            <button type="button" data-stage="4" onclick="setLessonStage(4)" class="stage-btn rounded-lg border p-2">交角截面</button>
+            <button type="button" data-stage="5" onclick="setLessonStage(5)" class="stage-btn rounded-lg border p-2">長方形</button>
+          </div>
+        </div>
+
+        <!-- 平面聚焦快速切換器 (手機橫向滑動或自動換行，觸控目標加大) -->
+        <div class="bg-slate-100 p-2 rounded-xl border border-slate-200 space-y-1.5">
+          <div class="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+            <span><i aria-hidden="true" class="fa-solid fa-bullseye text-indigo-600 mr-1"></i> 點擊鎖定並高亮觀察特定平面：</span>
+            <span id="currentFocusBadge" class="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-semibold shrink-0">全立體總覽</span>
+          </div>
+          <div class="flex overflow-x-auto sm:flex-wrap gap-1.5 pb-1 sm:pb-0 no-scrollbar text-xs">
+            <button onclick="setFocusPlane('ALL')" id="btnFocus_ALL" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold shadow-sm transition">全圖總覽</button>
+            <button onclick="setFocusPlane('BCD')" id="btnFocus_BCD" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">底面 $\triangle BCD$</button>
+            <button onclick="setFocusPlane('BED')" id="btnFocus_BED" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">直角 $\triangle BED$</button>
+            <button onclick="setFocusPlane('ABE')" id="btnFocus_ABE" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">斜面 $\triangle ABE$</button>
+            <button onclick="setFocusPlane('AEG')" id="btnFocus_AEG" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">直角 $\triangle AEG$</button>
+            <button onclick="setFocusPlane('AHK')" id="btnFocus_AHK" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">交角截面 $\triangle AHK$</button>
+            <button onclick="setFocusPlane('DEP')" id="btnFocus_DEP" class="focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition">E 點截面 $\triangle DEP$</button>
+          </div>
+        </div>
+
+        <!-- 3D Canvas 容器 (電腦版大幅加高加寬 h-[480px] xl:h-[540px]，支援滾輪與雙指縮放) -->
+        <div class="relative w-full h-[360px] sm:h-[460px] lg:h-[520px] mx-auto bg-slate-950 rounded-xl overflow-hidden shadow-inner border border-slate-800 cursor-grab active:cursor-grabbing select-none" id="canvasContainer">
+          <canvas id="geoCanvas" class="w-full h-full block" tabindex="0" role="img" aria-label="可旋轉四面體，方向鍵旋轉，加減鍵縮放，Home 重設。可用上方按鈕逐步顯示輔助線。"></canvas>
+
+          <div id="spreadBadge" class="hidden absolute top-16 sm:top-12 left-3 rounded-lg border border-amber-500/70 bg-amber-950/95 text-amber-100 text-xs font-bold px-2.5 py-1.5 pointer-events-none">教學示意：近點已展開，非等比例</div>
+
+          <!-- 頂部操作提示浮水印 -->
+          <div class="absolute top-2.5 left-2.5 right-2.5 flex justify-between items-center pointer-events-none gap-2">
+            <div class="bg-slate-900/85 backdrop-blur border border-slate-700 text-[10px] sm:text-xs text-slate-300 px-2.5 py-1 rounded-lg shadow">
+              <i aria-hidden="true" class="fa-solid fa-arrows-up-down-left-right mr-1 text-sky-400"></i> 拖曳 360° 旋轉 • 滾輪/雙指放大縮小 • Shift+拖曳平移
+            </div>
+            <div id="zoomBadge" class="bg-indigo-950/90 border border-indigo-700 text-indigo-200 text-[11px] font-mono px-2 py-1 rounded-lg">
+              100%
+            </div>
+          </div>
+
+          <!-- 右側懸浮縮放與視角控制按鈕組 -->
+          <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col space-y-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700 shadow-lg">
+            <button onclick="adjustZoom(0.2)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white flex items-center justify-center transition" title="放大 (Zoom In)">
+              <i aria-hidden="true" class="fa-solid fa-plus text-xs"></i>
+            </button>
+            <button onclick="resetZoomAndPan()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-300 text-[10px] font-bold flex items-center justify-center transition" title="重設縮放與置中">
+              1:1
+            </button>
+            <button onclick="adjustZoom(-0.2)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white flex items-center justify-center transition" title="縮小 (Zoom Out)">
+              <i aria-hidden="true" class="fa-solid fa-minus text-xs"></i>
+            </button>
+          </div>
+
+          <!-- 底部圖層控制開關列 -->
+          <div class="absolute bottom-2.5 left-2.5 right-2.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700 text-[11px] sm:text-xs text-slate-300 flex flex-wrap justify-between items-center gap-1.5">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 w-full justify-around sm:justify-start">
+              <label class="flex items-center cursor-pointer text-amber-300 hover:text-amber-200 py-0.5">
+                <input type="checkbox" id="chkShowGiven" checked onchange="requestRender()" class="mr-1.5 w-3.5 h-3.5 rounded accent-amber-500">
+                <span>題目條件</span>
+              </label>
+              <label class="flex items-center cursor-pointer text-emerald-300 hover:text-emerald-200 py-0.5">
+                <input type="checkbox" id="chkShowMarking" onchange="setLessonStage(this.checked ? 5 : 0)" class="mr-1.5 w-3.5 h-3.5 rounded accent-emerald-500">
+                <span>全部輔助線</span>
+              </label>
+              <label class="flex items-center cursor-pointer text-fuchsia-300 hover:text-fuchsia-200 py-0.5">
+                <input type="checkbox" id="chkShowMethodP" onchange="toggleMethodP(this.checked)" class="mr-1.5 w-3.5 h-3.5 rounded accent-fuchsia-500">
+                <span>E 點截面 (EP)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">「近點展開」會加寬 H／E、K／G 的間距，並在 E 點截面法中分開 A／P；仍保持共線、垂足及長方形關係。標示長度及角度採用題目真實數值，示意圖不可量度。關閉「近點展開」可查看真實比例。</p>
+
+        <div id="detailInset" class="hidden bg-slate-950 rounded-xl border border-emerald-700 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2 text-xs text-emerald-200">
+            <strong>底面長方形 HKGE：局部示意</strong>
+            <button type="button" onclick="toggleDetailInset(false)" class="px-2 py-1 rounded border border-slate-600" aria-label="關閉局部放大窗">關閉</button>
+          </div>
+          <canvas id="detailCanvas" class="w-full block" style="height:240px" role="img" aria-label="長方形 HKGE 的示意圖。E、F、G、D 在同一直線上，HE 約 0.0933 cm，HK 等於 EG 約 2.9809 cm。橫向已放大，並非等比例。"></canvas>
+          <p class="text-xs text-slate-300">橫向特別放大，兩軸並非相同比例；不可在此圖量度角度或比較長寬。原始計算座標保持不變。</p>
+        </div>
+
+        <!-- 2D 抽取平面說明卡片 -->
+        <div id="plane2DInspector" class="bg-indigo-950 text-white rounded-xl p-3 sm:p-3.5 border border-indigo-800 space-y-1.5">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <span class="text-xs font-bold text-amber-300 flex items-center" id="inspectorTitle">
+              <i aria-hidden="true" class="fa-solid fa-layer-group mr-1.5"></i> 平面拆解提示：全立體總覽
+            </span>
+            <span class="text-[10px] sm:text-[11px] bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded" id="inspectorTool">解題工具：空間觀察</span>
+          </div>
+          <p class="text-xs text-indigo-100 leading-relaxed" id="inspectorDesc">
+            點擊上方「平面聚焦按鈕」或在右側回答引導問題，這裡會自動將立體圖中的目標三角形單獨拆解出來，告訴你該用正弦、餘弦還是畢氏定理！
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 右欄：引導思考與三解法互動探究區 (大螢幕佔 6 欄) -->
+    <div class="lg:col-span-6 space-y-3 sm:space-y-4">
+
+      <!-- 導引進度步進條 (RWD 觸控按鈕優化) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 sm:p-3.5">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+            <i aria-hidden="true" class="fa-solid fa-route text-indigo-600 mr-1.5"></i> 階梯式「先選平面、後計算」引導流程
+          </span>
+          <span class="text-xs font-bold text-indigo-600 shrink-0" id="stepProgressText">第 1 / 4 步</span>
+        </div>
+        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex">
+          <div id="progressBar" class="bg-indigo-600 h-full w-1/4 transition-all duration-300"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2.5 text-center text-xs">
+          <button onclick="goToStep(1)" id="labelStep1" class="py-1.5 px-2 rounded-lg bg-indigo-50 font-bold text-indigo-700 border border-indigo-200 transition truncate">1. 破譯垂心</button>
+          <button onclick="goToStep(2)" id="labelStep2" class="py-1.5 px-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition truncate">2. 鎖定平面求 BD</button>
+          <button onclick="goToStep(3)" id="labelStep3" class="py-1.5 px-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition truncate">3. 鎖定平面求 BE</button>
+          <button onclick="goToStep(4)" id="labelStep4" class="py-1.5 px-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition truncate">4. 辨認及比較交角</button>
+        </div>
+      </div>
+
+      <!-- 步驟 1：垂心的幾何密碼 -->
+      <div id="stepCard1" class="step-card bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div class="flex items-center justify-between border-b pb-3 gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
+            <h3 class="font-bold text-slate-800 text-sm sm:text-base">解碼題目的隱藏條件：什麼是「垂心」？</h3>
+          </div>
+          <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold shrink-0">口述引導 #1</span>
+        </div>
+
+        <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-xs sm:text-sm text-amber-900 leading-relaxed">
+          <strong><i aria-hidden="true" class="fa-solid fa-comments mr-1"></i> 學生邊做邊講引導：</strong><br>
+          試向身邊同學或老師解釋：「題目說 $F$ 是 $\triangle BCD$ 的垂心（Orthocentre），而且 $DF$ 延長交 $BC$ 於 $E$，這代表線段 $DE$ 在 $\triangle BCD$ 入面扮演咩角色？點解？」
+        </div>
+
+        <div class="space-y-2.5">
+          <label class="flex items-start sm:items-center p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs sm:text-sm transition">
+            <input type="radio" name="q1" value="A" class="mt-0.5 sm:mt-0 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500 shrink-0">
+            <span>A. $E$ 是 $BC$ 的中點，因為垂心是中線交點（$BE = EC = 4\text{ cm}$）</span>
+          </label>
+          <label class="flex items-start sm:items-center p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs sm:text-sm transition">
+            <input type="radio" name="q1" value="B" class="mt-0.5 sm:mt-0 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500 shrink-0">
+            <span>B. $DE$ 是 $\triangle BCD$ 的高線，因此 $DE \perp BC$，即 $\angle DEB = \angle DEC = 90^\circ$</span>
+          </label>
+          <label class="flex items-start sm:items-center p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs sm:text-sm transition">
+            <input type="radio" name="q1" value="C" class="mt-0.5 sm:mt-0 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500 shrink-0">
+            <span>C. $DF$ 垂直於整個底面 $\triangle BCD$</span>
+          </label>
+        </div>
+
+        <div id="feedback1" class="hidden p-3.5 rounded-xl text-xs sm:text-sm leading-relaxed"></div>
+
+        <div class="flex justify-end pt-2">
+          <button onclick="checkStep1()" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm shadow-sm transition flex items-center justify-center">
+            驗證我的想法 <i aria-hidden="true" class="fa-solid fa-arrow-right ml-1.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 步驟 2：先鎖定平面，再求 BD -->
+      <div id="stepCard2" class="step-card hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div class="flex items-center justify-between border-b pb-3 gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
+            <h3 class="font-bold text-slate-800 text-sm sm:text-base">第 (a)(i) 部分：求 $BD$ 的長度</h3>
+          </div>
+          <span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 shrink-0">得分目標：2 分</span>
+        </div>
+
+        <!-- 思考問題 2A：選擇正確的三角形平面 -->
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+          <p class="text-xs sm:text-sm font-bold text-indigo-950 flex items-start sm:items-center">
+            <i aria-hidden="true" class="fa-solid fa-compass text-indigo-600 mr-1.5 mt-0.5 sm:mt-0 shrink-0"></i>
+            <span>第一關（平面定位）：為求得 $BD$，我們應該先專注在哪一個三角形平面上？為什麼？</span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <button onclick="selectPlaneStep2('ABD')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>$\triangle ABD$</strong><br><span class="text-slate-500">包含 $AB=6$ 及 $BD$</span>
+            </button>
+            <button onclick="selectPlaneStep2('BCD')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>$\triangle BCD$</strong><br><span class="text-slate-500">已知 $BC=8, 70^\circ, 50^\circ$</span>
+            </button>
+            <button onclick="selectPlaneStep2('BED')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>直角 $\triangle BED$</strong><br><span class="text-slate-500">已知 $\angle CBD=70^\circ, 90^\circ$</span>
+            </button>
+          </div>
+          <div id="planeFeedback2" class="hidden p-3 rounded-lg text-xs leading-relaxed"></div>
+        </div>
+
+        <!-- 計算區 -->
+        <div id="calcZone2" class="space-y-3 pt-2 border-t border-slate-100">
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            在底面 $\triangle BCD$ 中，已知兩角一邊（AAS）：$\angle CBD = 70^\circ$、$\angle BDC = 50^\circ$、$BC = 8\text{ cm}$。<br>
+            1. 先用三角形內角和求出 $BD$ 的對角 $\angle BCD = 180^\circ - 70^\circ - 50^\circ = \mathbf{60^\circ}$。<br>
+            2. 應用<strong>正弦公式（Sine Rule）</strong>：
+          </p>
+          <div class="bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100 text-center text-xs sm:text-sm overflow-x-auto">
+            $$\frac{BD}{\sin 60^\circ} = \frac{8}{\sin 50^\circ} \implies BD = \frac{8 \sin 60^\circ}{\sin 50^\circ}$$
+          </div>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <label class="text-xs sm:text-sm font-medium text-slate-700">請輸入 $BD$ 的計算值（取 3 位有效數字）：</label>
+            <div class="flex items-center space-x-2">
+              <input type="number" id="inputBD" step="0.01" inputmode="decimal" placeholder="輸入計算結果" class="w-full sm:w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+              <span class="text-sm text-slate-500 font-mono">cm</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="feedback2" class="hidden p-3.5 rounded-xl text-xs sm:text-sm leading-relaxed"></div>
+
+        <div class="flex flex-col-reverse sm:flex-row justify-between items-center gap-2 pt-2">
+          <button onclick="goToStep(1)" class="w-full sm:w-auto py-2 text-slate-500 hover:text-slate-700 text-xs sm:text-sm text-center"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> 上一步</button>
+          <button onclick="checkStep2()" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm shadow-sm transition">
+            驗證 $BD$ 並繼續 <i aria-hidden="true" class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 步驟 3：先鎖定平面，再求 BE -->
+      <div id="stepCard3" class="step-card hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div class="flex items-center justify-between border-b pb-3 gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
+            <h3 class="font-bold text-slate-800 text-sm sm:text-base">第 (a)(ii) 部分：求 $BE$ 的長度</h3>
+          </div>
+          <span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 shrink-0">得分目標：1 分</span>
+        </div>
+
+        <!-- 思考問題 3A：選擇正確的三角形平面 -->
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+          <p class="text-xs sm:text-sm font-bold text-indigo-950 flex items-start sm:items-center">
+            <i aria-hidden="true" class="fa-solid fa-compass text-indigo-600 mr-1.5 mt-0.5 sm:mt-0 shrink-0"></i>
+            <span>第一關（平面定位）：現在已知斜邊 $BD \approx 9.0441\text{ cm}$ 且 $DE \perp BC$，求 $BE$ 應該專注在哪個直角三角形？</span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <button onclick="selectPlaneStep3('ABE')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>$\triangle ABE$</strong><br><span class="text-slate-500">位於斜面 $\triangle ABC$ 上</span>
+            </button>
+            <button onclick="selectPlaneStep3('BED')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>直角 $\triangle BED$</strong><br><span class="text-slate-500">底面上 $\angle BED = 90^\circ$</span>
+            </button>
+            <button onclick="selectPlaneStep3('CED')" class="p-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-95 text-left transition">
+              <strong>直角 $\triangle CED$</strong><br><span class="text-slate-500">底面上 $\angle CED = 90^\circ$</span>
+            </button>
+          </div>
+          <div id="planeFeedback3" class="hidden p-3 rounded-lg text-xs leading-relaxed"></div>
+        </div>
+
+        <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          在底面的直角 $\triangle BED$ 中，$\angle BED = 90^\circ$，$\angle EBD = 70^\circ$，$BD \approx 9.0441\text{ cm}$。<br>
+          由於 $BE$ 是 $70^\circ$ 的<strong>鄰邊（Adjacent）</strong>，$BD$ 是<strong>斜邊（Hypotenuse）</strong>：
+        </p>
+
+        <div class="bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 text-xs sm:text-sm overflow-x-auto">
+          <div class="text-center font-mono py-1 text-indigo-950 font-bold">
+            $$\cos 70^\circ = \frac{BE}{BD} \implies BE = 9.044127 \times \cos 70^\circ$$
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <label class="text-xs sm:text-sm font-medium text-slate-700">輸入計算之 $BE$（取 3 位有效數字）：</label>
+          <div class="flex items-center space-x-2">
+            <input type="number" id="inputBE" step="0.01" inputmode="decimal" placeholder="輸入計算結果" class="w-full sm:w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <span class="text-sm text-slate-500 font-mono">cm</span>
+          </div>
+        </div>
+
+        <div id="feedback3" class="hidden p-3.5 rounded-xl text-xs sm:text-sm leading-relaxed"></div>
+
+        <div class="flex flex-col-reverse sm:flex-row justify-between items-center gap-2 pt-2">
+          <button onclick="goToStep(2)" class="w-full sm:w-auto py-2 text-slate-500 hover:text-slate-700 text-xs sm:text-sm text-center"><i aria-hidden="true" class="fa-solid fa-arrow-left mr-1"></i> 上一步</button>
+          <button onclick="checkStep3()" class="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium rounded-xl text-xs sm:text-sm shadow-sm transition">
+            檢查答案並進入 (b) 部 <i aria-hidden="true" class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+
+
+      <div id="stepCard4" class="step-card hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div class="border-b pb-3 space-y-1">
+          <h3 class="font-bold text-slate-800 text-sm sm:text-base">第 (b) 部：先辨認交角，再判斷大小</h3>
+          <p class="text-xs text-slate-500">辨認公共邊 → 驗證兩條垂線 → 建立交角 → 比較大小</p>
+        </div>
+        <section class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-3" aria-labelledby="angleQuestion">
+          <h4 id="angleQuestion" class="font-bold text-sm text-amber-950">① 題目給的 ∠AEF = 55°，是否就是兩平面的交角？</h4>
+          <p class="text-xs text-slate-700">兩平面的公共邊是 BC。試先判斷兩條構成角度的線，是否都垂直 BC。</p>
+          <div class="grid gap-2 text-xs">
+            <button type="button" onclick="checkAngleChoice('given')" class="p-3 text-left bg-white border rounded-lg">是，題目給出的 55° 就是交角。</button>
+            <button type="button" onclick="checkAngleChoice('verify')" class="p-3 text-left bg-white border rounded-lg">需要先驗證：EF ⟂ BC，但 AE 也垂直 BC 嗎？</button>
+            <button type="button" onclick="checkAngleChoice('sixty')" class="p-3 text-left bg-white border rounded-lg">應該是 ∠ABC = 60°。</button>
+          </div>
+          <div id="angleFeedback" class="hidden text-xs leading-relaxed" role="status"></div>
+        </section>
+        <section id="footCheck" class="hidden bg-slate-50 border rounded-xl p-3 space-y-3">
+          <h4 class="text-sm font-bold">② 作 AH ⟂ BC 於 H，比較 H 與 E 的位置</h4>
+          <p class="text-xs">在直角 $\triangle ABH$ 中，$BH = AB\cos\angle ABC$。先求 BH，再與 $BE \approx 3.0933\text{ cm}$ 比較。</p>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <label for="inputBH">BH =</label><input id="inputBH" type="number" inputmode="decimal" step="0.01" oninput="invalidateFoot()" class="w-28 border rounded-lg px-3 py-2" aria-describedby="footFeedback"><span>cm</span>
+            <button type="button" onclick="checkFoot()" class="bg-indigo-600 text-white rounded-lg px-3 py-2">檢查位置</button>
+          </div>
+          <div id="footFeedback" class="text-xs leading-relaxed" role="status"></div>
+        </section>
+        <section id="angleConstruction" class="hidden bg-sky-50 border border-sky-200 rounded-xl p-3 space-y-3">
+          <h4 class="text-sm font-bold">③ 建立真正交角</h4>
+          <p class="text-xs leading-relaxed">在斜面內已有 AH ⟂ BC。再作 AK 垂直底面 BCD 於 K，連接 HK；由三垂線定理，HK ⟂ BC。因此 AH 與 HK 在公共邊上的同一點 H 相交，∠AHK 才是兩平面的交角。</p>
+          <button type="button" onclick="showIntersectionSection()" class="bg-sky-700 text-white rounded-lg px-3 py-2 text-xs">顯示 AK、HK 及交角截面</button>
+        </section>
+        <section id="lengthComparison" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-3">
+          <h4 class="text-sm font-bold">④ 若計算器顯示 55.0°，怎樣確定交角有沒有超過 55°？</h4>
+          <p class="text-xs">H、E 在 BC 上，且 H ≠ E。在直角 $\triangle AHE$ 中，哪條線較長？</p>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <button type="button" onclick="checkLengthComparison('AE')" class="bg-white border rounded-lg px-4 py-2">AE &gt; AH</button>
+            <button type="button" onclick="checkLengthComparison('equal')" class="bg-white border rounded-lg px-4 py-2">AE = AH</button>
+            <button type="button" onclick="checkLengthComparison('AH')" class="bg-white border rounded-lg px-4 py-2">AH &gt; AE</button>
+          </div>
+          <p id="comparisonFeedback" class="text-xs leading-relaxed" role="status"></p>
+        </section>
+        <section id="mainProof" class="hidden space-y-3">
+          <h4 class="font-bold text-sm">⑤ 加入 G，利用同一段底面長度比較餘弦</h4>
+          <p class="text-xs leading-relaxed">作 AG ⟂ DE 於 G，因此 G 在橙色 DE 上。由三垂線定理，KG ⟂ DE。底面內 HK ∥ EG、KG ∥ HE，所以 HKGE 是長方形，HK = EG。設真正交角為 $\theta = \angle AHK$。</p>
+          <div class="flex flex-wrap gap-2 text-xs" role="group" aria-label="選擇解題方式">
+            <button id="btnProofReason" type="button" onclick="setProofMode('reason')" aria-pressed="true" class="bg-indigo-600 text-white rounded-lg px-3 py-2">幾何推理：不用求出交角</button>
+            <button id="btnProofNumeric" type="button" onclick="setProofMode('numeric')" aria-pressed="false" class="bg-slate-100 rounded-lg px-3 py-2">數值驗算</button>
+          </div>
+          <div id="reasonProof" class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs leading-relaxed overflow-x-auto">
+            <p>在直角 $\triangle AEG$ 中，$EG = AE\cos55^\circ$；在直角 $\triangle AHK$ 中：</p>
+            $$\begin{aligned}\cos\theta &amp;= \frac{HK}{AH} = \frac{EG}{AH}\\ &amp;= \frac{AE}{AH}\cos55^\circ > \cos55^\circ\end{aligned}$$
+            <p>因為 AE &gt; AH，且兩角均為銳角，餘弦較大表示角度較小，因此 $\theta &lt; 55^\circ$。這個判斷不依賴把交角四捨五入後的顯示值。</p>
+          </div>
+          <div id="numericProof" class="hidden bg-slate-50 border rounded-xl p-3 text-xs leading-relaxed overflow-x-auto">
+            <p>中途保留計算器內的完整數值。由 $AH=6\sin60^\circ$、$HE=BE-3$：</p>
+            $$AE=\sqrt{AH^2+HE^2}\approx5.19698951\text{ cm}$$
+            $$EG=AE\cos55^\circ\approx2.98087072\text{ cm}$$
+            $$\theta=\cos^{-1}\!\left(\frac{EG}{AH}\right)\approx54.99353668^\circ$$
+            <p>只顯示一位小數時會得到 55.0°；單憑這個顯示值，不能判斷原值在 55° 的哪一側。可以用上方幾何推理確定。</p>
+          </div>
+          <p class="font-bold text-sm">你是否同意「兩平面的交角不超過 55°」？</p>
+          <div class="grid sm:grid-cols-3 gap-2 text-xs">
+            <button type="button" onclick="handleFinalClaim('agree')" class="border rounded-xl p-3 bg-emerald-50 text-emerald-900">同意，並能說明理由</button>
+            <button type="button" onclick="handleFinalClaim('disagree')" class="border rounded-xl p-3 bg-white">不同意</button>
+            <button type="button" onclick="handleFinalClaim('rounded')" class="border rounded-xl p-3 bg-white">只看 55.0°，仍未能確定</button>
+          </div>
+        </section>
+        <div id="feedbackContainer4" class="hidden p-3 rounded-xl text-xs leading-relaxed border" role="status"></div>
+        <details id="extensionMethods" class="border rounded-xl p-3">
+          <summary class="cursor-pointer text-xs font-bold text-indigo-800">延伸：完成主線後，比較三種完整解法</summary>
+          <div class="mt-3 space-y-3">        <!-- 三種解題路徑切換 Tab (RWD 網格：手機單欄堆疊或三欄自適應) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-xl text-xs font-bold">
+          <button id="tabMethod1" onclick="switchBMethod('method1')" class="py-2.5 px-3 rounded-lg bg-indigo-600 text-white shadow-sm transition flex items-center justify-center text-center">
+            <i aria-hidden="true" class="fa-solid fa-vector-square mr-1.5 shrink-0"></i>
+            <span>方法一：長方形數值法<span class="block text-[10px] font-normal opacity-90">(由 A 作垂線 G,H,K)</span></span>
+          </button>
+          <button id="tabMethod3" onclick="switchBMethod('method3')" class="py-2.5 px-3 rounded-lg text-slate-600 hover:bg-white transition flex items-center justify-center text-center">
+            <i aria-hidden="true" class="fa-solid fa-ruler-combined mr-1.5 shrink-0"></i>
+            <span>方法二：E 點截面法<span class="block text-[10px] font-normal opacity-80">(EP ⟂ BC，P 在 AC 上)</span></span>
+          </button>
+          <button id="tabMethod2" onclick="switchBMethod('method2')" class="py-2.5 px-3 rounded-lg text-slate-600 hover:bg-white transition flex items-center justify-center text-center">
+            <i aria-hidden="true" class="fa-solid fa-scale-balanced mr-1.5 shrink-0"></i>
+            <span>方法三：三垂線公式法<span class="block text-[10px] font-normal opacity-80">($\cos\theta$ 關係秒殺法)</span></span>
+          </button>
+        </div>
+
+        <!-- ==================== 方法一：長方形法 長方形法 ==================== -->
+        <div id="method1Content" class="space-y-3 text-xs sm:text-sm">
+          <div class="bg-indigo-50/70 p-3 sm:p-3.5 rounded-xl border border-indigo-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-950 text-xs sm:text-sm"><i aria-hidden="true" class="fa-solid fa-stairs text-indigo-600 mr-1.5"></i> 長方形法 思考階梯（點擊步驟可切換 3D 聚焦平面）：</span>
+            </div>
+
+            <div class="space-y-2.5">
+              <div onclick="setFocusPlane('ABE')" class="p-3 bg-white rounded-xl border border-indigo-100 hover:border-indigo-400 active:bg-indigo-50/40 cursor-pointer transition">
+                <div class="flex flex-wrap justify-between items-center gap-1 font-bold text-indigo-900 text-xs">
+                  <span>步驟 1：鎖定斜面 $\triangle ABE$ $\to$ 求斜線 $AE$</span>
+                  <span class="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md"><i aria-hidden="true" class="fa-solid fa-eye mr-1"></i>點擊聚焦 $\triangle ABE$</span>
+                </div>
+                <div class="text-xs text-slate-600 mt-1.5 overflow-x-auto">
+                  已知 $AB=6$、$BE \approx 3.0933$ 及夾角 $\angle ABE=60^\circ$（SAS），用<strong>餘弦公式</strong>：
+                  $$AE = \sqrt{6^2 + 3.0933^2 - 2(6)(3.0933)\cos 60^\circ} \approx \mathbf{5.1970\text{ cm}}$$
+                </div>
+              </div>
+
+              <div onclick="setFocusPlane('AEG')" class="p-3 bg-white rounded-xl border border-indigo-100 hover:border-indigo-400 active:bg-indigo-50/40 cursor-pointer transition">
+                <div class="flex flex-wrap justify-between items-center gap-1 font-bold text-indigo-900 text-xs">
+                  <span>步驟 2：鎖定直角三角形 $\triangle AEG$ $\to$ 求底面投影段 $EG$</span>
+                  <span class="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md"><i aria-hidden="true" class="fa-solid fa-eye mr-1"></i>點擊聚焦 $\triangle AEG$</span>
+                </div>
+                <div class="text-xs text-slate-600 mt-1.5 overflow-x-auto">
+                  設 $G$ 為由 $A$ 至 $DE$ 的垂足（即 $\angle AGE = 90^\circ$）。在直角 $\triangle AEG$ 中，已知 $\angle AEF = 55^\circ$：
+                  $$\cos 55^\circ = \frac{EG}{AE} \implies EG = 5.1970 \cos 55^\circ \approx \mathbf{2.9809\text{ cm}}$$
+                </div>
+              </div>
+
+              <div onclick="setFocusPlane('AHK')" class="p-3 bg-white rounded-xl border border-indigo-100 hover:border-indigo-400 active:bg-indigo-50/40 cursor-pointer transition">
+                <div class="flex flex-wrap justify-between items-center gap-1 font-bold text-indigo-900 text-xs">
+                  <span>步驟 3：鎖定交角截面 $\triangle AHK$ 與長方形 $HKGE$ $\to$ 求 $\angle AHK$</span>
+                  <span class="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md"><i aria-hidden="true" class="fa-solid fa-eye mr-1"></i>點擊聚焦 $\triangle AHK$</span>
+                </div>
+                <div class="text-xs text-slate-600 mt-1.5 space-y-1 overflow-x-auto">
+                  <p>• 在斜面 $\triangle ABC$ 作 $AH \perp BC$ 於 $H$：在直角 $\triangle ABH$ 中，$AH = 6\sin 60^\circ \approx \mathbf{5.1962\text{ cm}}$。</p>
+                  <p>• 作 $AK \perp \text{底面}$ 於 $K$。因為底面上 $HE \perp ED$，四個垂足在底面圍成<strong>長方形 $HKGE$</strong>！</p>
+                  <p>• 因此對邊相等：$HK = EG \approx \mathbf{2.9809\text{ cm}}$。</p>
+                  <p>• 在直角 $\triangle AHK$ 中：</p>
+                  $$\cos \angle AHK = \frac{HK}{AH} \approx \frac{2.98087}{5.19615} \implies \angle AHK \approx \mathbf{54.9935^\circ}$$
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- ==================== 方法二：由 E 作 EP 垂直 BC ==================== -->
+        <div id="method3Content" class="hidden space-y-3 text-xs sm:text-sm">
+          <div class="bg-fuchsia-50 border border-fuchsia-200 rounded-xl p-3 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <strong class="text-fuchsia-950">由 E 作 EP ⟂ BC，交 AC 於 P</strong>
+              <button type="button" onclick="showMethodP()" class="bg-fuchsia-600 text-white rounded-lg px-3 py-2 text-xs">顯示 E 點截面</button>
+            </div>
+            <p class="text-xs leading-relaxed">EP 位於平面 ABC，ED 位於底面 BCD，兩線同在公共邊上的 E 點垂直 BC。因此真正交角就是 $\angle PEF=\angle PED$。P 在 AC 上，且 P 與 A 不同；近點展開模式會將兩點分開。∠AEP 與 ∠PEF 分屬不同截面，不能直接以 55° 加減。</p>
+            <div class="bg-white rounded-xl border p-3 text-xs leading-relaxed space-y-3">
+              <p><strong>1. 用相似三角形求 EP、CP。</strong>沿用主線的 $BH=3$、$AH=6\sin60^\circ$，所以 $CH=8-3=5$。由 EP ∥ AH，$\triangle CEP\sim\triangle CHA$：</p>
+              <div class="formula-scroll">$$CE=8-BE\approx4.90672639\text{ cm}$$</div>
+              <div class="formula-scroll">$$\frac{EP}{AH}=\frac{CP}{CA}=\frac{CE}{CH}$$</div>
+              <div class="formula-scroll">$$EP\approx5.09921964\text{ cm},\quad CP\approx7.07658143\text{ cm}$$</div>
+              <p>其中 $AC=\sqrt{6^2+8^2-2(6)(8)\cos60^\circ}=\sqrt{52}$。</p>
+              <p><strong>2. 求 AD、CD，再定位 AC 與 CD 的夾角。</strong>在底面求 $DE=BD\sin70^\circ$；因射線 EF 與 ED 同向，$\angle AED=55^\circ$。利用主線已求得的 AE，在 $\triangle AED$ 中：</p>
+              <div class="formula-scroll">$$AD=\sqrt{AE^2+DE^2-2AE\cdot DE\cos55^\circ}$$</div>
+              <div class="formula-scroll">$$AD\approx6.96918525\text{ cm}$$</div>
+              <div class="formula-scroll">$$CD=\frac{8\sin70^\circ}{\sin50^\circ}\approx9.81345278\text{ cm}$$</div>
+              <p>在 $\triangle ACD$ 中用餘弦公式：</p>
+              <div class="formula-scroll">$$\cos\angle DCA=\frac{AC^2+CD^2-AD^2}{2AC\cdot CD}$$</div>
+              <div class="formula-scroll">$$\angle DCA\approx45.19641416^\circ$$</div>
+              <p><strong>3. 求 DP，最後在真正交角截面 DEP 中求角。</strong>因 P 在 AC 上，$\angle DCP=\angle DCA$：</p>
+              <div class="formula-scroll">$$DP=\sqrt{CD^2+CP^2-2CD\cdot CP\cos\angle DCA}$$</div>
+              <div class="formula-scroll">$$DP\approx6.96477306\text{ cm}$$</div>
+              <div class="formula-scroll">$$\cos\angle PED=\frac{EP^2+DE^2-DP^2}{2EP\cdot DE}$$</div>
+              <div class="formula-scroll">$$\angle PEF=\angle PED\approx54.99353668^\circ<55^\circ$$</div>
+              <p class="text-slate-600">此法直接辨認 E 點的交角，毋須建立底面長方形，但數值計算較多。手機可左右滑動查看長公式。中途請保留計算器完整數值；也可回到主線用 AE &gt; AH 的推理判斷大小。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 方法三：三垂線餘弦關係秒殺法 ==================== -->
+        <div id="method2Content" class="hidden space-y-3 text-xs sm:text-sm">
+          <div class="bg-emerald-50/70 p-3 sm:p-3.5 rounded-xl border border-emerald-200 space-y-2.5 text-xs overflow-x-auto">
+            <p class="font-bold text-emerald-950 flex items-center">
+              <i aria-hidden="true" class="fa-solid fa-bolt text-amber-500 mr-1.5"></i> 進階思維：為什麼 $\angle AHK$（約 $54.99^\circ$）跟 $\angle AEF$（$55^\circ$）會這麼接近？
+            </p>
+            <p class="text-slate-700 leading-relaxed">
+              比較兩個直角三角形：<br>
+              1. <strong>題目給的直角 $\triangle AEG$</strong>：$\cos 55^\circ = \frac{EG}{AE}$<br>
+              2. <strong>真實交角直角 $\triangle AHK$</strong>：$\cos \theta = \frac{HK}{AH}$<br>
+              因為底面長方形性質使分子完全相同（$HK = EG$），所以兩者的餘弦比值只取決於分母 $AH$ 與 $AE$：
+            </p>
+            <div class="p-2.5 bg-white rounded-lg border border-emerald-200 text-center font-mono">
+              $$\cos \theta = \frac{AE}{AH} \cdot \cos 55^\circ$$
+            </div>
+            <p class="text-slate-700 leading-relaxed">
+              • 在斜面 $\triangle ABC$ 的直角 $\triangle AHE$ 中，$AH$ 是直角邊（$5.19615\text{ cm}$），而 $AE$ 是斜邊！<br>
+              • 因為 $HE = BE - BH \approx 3.0933 - 3 = 0.0933\text{ cm}$（只差不到 $1\text{ mm}$！），所以斜邊 $AE = \sqrt{AH^2 + HE^2} \approx 5.19699\text{ cm}$ 略大於直角邊 $AH$！<br>
+              • 既然 $AE > AH$，就有 $\frac{AE}{AH} > 1 \implies \cos \theta > \cos 55^\circ$。<br>
+              • 因為在 $0^\circ$ 到 $90^\circ$ 之間，$\cos$ 越大代表角度越小，所以<strong>必定有 $\theta < 55^\circ$</strong>！
+            </p>
+          </div>
+        </div>
+
+</div>
+        </details>
+        <div class="flex flex-wrap justify-between gap-2 text-xs">
+          <button type="button" onclick="goToStep(3)" class="px-3 py-2 rounded-lg border">上一步</button>
+          <button type="button" onclick="showFullSolutionModal()" class="px-3 py-2 rounded-lg bg-indigo-700 text-white">查看完整參考解答</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- 完整評分標準彈窗 Modal (RWD 優化內距與捲動) -->
+  <div id="solutionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2.5 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-100 p-4 sm:p-6 space-y-4">
+      <div class="flex items-center justify-between border-b pb-3 sticky top-0 bg-white z-10">
+        <h3 class="text-sm sm:text-lg font-bold text-indigo-950 flex items-center">
+          <i aria-hidden="true" class="fa-solid fa-award text-amber-500 mr-2 text-lg sm:text-xl"></i>
+          DSE 參考解答（非官方評分表）
+        </h3>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 text-xl font-bold">&times;</button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm text-slate-700">
+        <p class="text-xs text-slate-500">以下為本頁整理的參考解答；分數分配只作教學示例，未核對官方評分表。</p>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs overflow-x-auto">
+          <strong>(b) 幾何判斷：不用求出交角</strong>
+          <p>$BH=6\cos60^\circ=3\text{ cm}$，而 $BE\approx3.0933\text{ cm}$，故 $H\ne E$。在直角 $\triangle AHE$ 中，$AE>AH$。作 $AK\perp$ 底面、$AG\perp DE$，由三垂線定理得 $HK\perp BC$、$KG\perp DE$，故 $HKGE$ 是長方形，$HK=EG$。設真正交角為 $\theta=\angle AHK$：</p>
+          $$\cos\theta=\frac{HK}{AH}=\frac{AE}{AH}\cos55^\circ>\cos55^\circ$$
+          <p>兩角均為銳角，故 $\theta<55^\circ$，同意該宣稱。</p>
+        </div>
+
+        <!-- Part A -->
+        <div class="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 space-y-2">
+          <div class="flex justify-between items-center font-bold text-indigo-900">
+            <span>(a) 求 $BD$ 及 $BE$</span>
+            <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">3 分</span>
+          </div>
+          <div class="text-xs space-y-2 bg-white p-3 rounded-lg border border-slate-100 leading-relaxed overflow-x-auto">
+            <p>在 $\triangle BCD$ 中，$\angle BCD = 180^\circ - 70^\circ - 50^\circ = 60^\circ$</p>
+            <p>藉正弦公式：</p>
+            <div class="text-center font-serif py-0.5">
+              $$\frac{BD}{\sin 60^\circ} = \frac{8}{\sin 50^\circ}$$
+            </div>
+            <p class="flex justify-between items-center flex-wrap gap-1">
+              <span>$BD \approx 9.04412699\text{ cm} \implies BD \approx \mathbf{9.04\text{ cm}}$</span>
+              <span class="text-emerald-600 font-bold">(1M + 1A)</span>
+            </p>
+            <hr class="my-1.5 border-slate-100">
+            <p>因 $F$ 是 $\triangle BCD$ 的垂心，$DFE \perp BC$，即 $\angle DEB = 90^\circ$</p>
+            <p>在直角 $\triangle BED$ 中：</p>
+            <div class="text-center font-serif py-0.5">
+              $$BE = BD \cos 70^\circ \approx 9.04412699 \cdot \cos 70^\circ \approx 3.0932736\text{ cm} \implies BE \approx \mathbf{3.09\text{ cm}}$$
+            </div>
+            <p class="text-right"><span class="text-emerald-600 font-bold">(1A)</span></p>
+          </div>
+        </div>
+
+        <!-- Part B -->
+        <div class="bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-200 space-y-2">
+          <div class="flex justify-between items-center font-bold text-indigo-900">
+            <span>(b) 某人宣稱兩面交角不超過 $55^\circ$。你是否同意？</span>
+            <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">4 分</span>
+          </div>
+          <div class="text-xs leading-relaxed space-y-2 bg-white p-3 rounded-lg border border-slate-100 font-mono overflow-x-auto">
+            <p class="font-sans font-semibold text-slate-800">長方形法參考步驟：</p>
+            <p>
+              考慮 $\triangle ABE$。藉餘弦公式：<br>
+              $AE^2 = AB^2 + BE^2 - 2(AB)(BE)\cos\angle ABE$<br>
+              $AE^2 \approx 6^2 + 3.0932736^2 - 2(6)(3.0932736)\cos 60^\circ$<br>
+              $AE \approx \mathbf{5.19698951\text{ cm}}$ <span class="text-emerald-600 font-bold float-right">(1M)</span>
+            </p>
+            <p>
+              設 $G$ 為由 $A$ 至 $DE$ 的垂足。考慮直角 $\triangle AEG$：<br>
+              $\cos\angle AEF = \frac{EG}{AE} \implies \cos 55^\circ \approx \frac{EG}{5.19698951}$<br>
+              $EG \approx \mathbf{2.980870723\text{ cm}}$ <span class="text-emerald-600 font-bold float-right">(1M)</span>
+            </p>
+            <p>
+              設 $H$ 及 $K$ 分別為由 $A$ 至 $BC$ 及 $\triangle BCD$ 的垂足。<br>
+              $\triangle ABC$ 與 $\triangle BCD$ 間的交角為 $\angle AHK$。<br>
+              考慮直角 $\triangle ABH$：$\sin 60^\circ = \frac{AH}{6} \implies AH \approx \mathbf{5.196152423\text{ cm}}$
+            </p>
+            <p class="bg-indigo-50 p-2 rounded border border-indigo-100 font-sans text-indigo-950">
+              因為 $HKGE$ 為一長方形，所以 $HK = EG \approx 2.980870723\text{ cm}$。
+            </p>
+            <p>
+              考慮直角 $\triangle AHK$：<br>
+              $\cos\angle AHK = \frac{HK}{AH} \approx \frac{2.980870723}{5.196152423}$<br>
+              <strong>$\angle AHK \approx 54.99353669^\circ < 55^\circ$</strong> <span class="text-emerald-600 font-bold float-right">(1M)</span>
+            </p>
+            <p class="font-sans font-bold text-emerald-800 bg-emerald-50 p-2 rounded border border-emerald-200">
+              因此，<strong>同意該宣稱</strong>。<span class="text-emerald-600 font-bold float-right">(1A)</span>
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal()" class="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs sm:text-sm font-medium">關閉視窗</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 頁尾 -->
+  <footer class="bg-slate-100 border-t border-slate-200 py-3 px-4 text-center text-xs text-slate-500 mt-auto">
+    DSE 幾何思維引導課件 • 支援手機、平板與電腦全響應式 (RWD) 3D 互動
+  </footer>
+
+  <!-- 3D 渲染與互動核心邏輯 -->
+  <script>
+    // ---------- 手機端題目卡片折疊功能 ----------
+    let isProblemOpen = true;
+    function toggleMobileProblemCard() {
+      if (window.innerWidth >= 640) return; // 平板與電腦不折疊
+      const body = document.getElementById('problemCardBody');
+      const icon = document.getElementById('problemCollapseIcon');
+      isProblemOpen = !isProblemOpen;
+      if (isProblemOpen) {
+        body.classList.remove('hidden');
+        icon.className = 'fa-solid fa-chevron-up';
+      } else {
+        body.classList.add('hidden');
+        icon.className = 'fa-solid fa-chevron-down';
+      }
+    }
+
+    // ---------- MathJax 動態渲染輔助函數 ----------
+    // Serialize typesetting: overlapping MathJax 3 calls can duplicate output.
+    let mathRenderQueue = Promise.resolve();
+    function renderMath(element) {
+      mathRenderQueue = mathRenderQueue.then(async () => {
+        if (!window.MathJax || !window.MathJax.typesetPromise) return;
+        if (window.MathJax.startup && window.MathJax.startup.promise) await window.MathJax.startup.promise;
+        await window.MathJax.typesetPromise(element ? [element] : undefined);
+      }).catch(err => console.warn(err));
+      return mathRenderQueue;
+    }
+
+    // ---------- 3D 幾何模型：始終使用題目真實數據 ----------
+    const BD_len = 8 * Math.sin(Math.PI / 3) / Math.sin(50 * Math.PI / 180); // ≈ 9.0441 cm
+    const BE_len = BD_len * Math.cos(70 * Math.PI / 180);                    // ≈ 3.0933 cm
+    const DE_len = BD_len * Math.sin(70 * Math.PI / 180);                    // ≈ 8.4987 cm
+
+    // 從題目條件計算長度，避免用四捨五入的交角重建模型。
+    const AH_len = 6 * Math.sin(Math.PI / 3);                                // ≈ 5.1962 cm
+    const AE_len = Math.sqrt(6 ** 2 + BE_len ** 2 - 2 * 6 * BE_len * Math.cos(Math.PI / 3));
+    const HK_len = AE_len * Math.cos(55 * Math.PI / 180);                    // EG = HK ≈ 2.9809 cm
+    const AK_len = Math.sqrt(AH_len ** 2 - HK_len ** 2);                     // ≈ 4.2561 cm
+
+    let lessonStage = 0;
+    let detailInsetOpen = false;
+    let angleVerified = false;
+    let sectionRevealed = false;
+    let proofRevealed = false;
+    let modelRadius = 1;
+    let spreadNearPoints = true;
+    let displayVertices = {};
+
+    let rawVertices = {};
+    let modelPoints = {};
+    // 提升基礎比例，讓電腦與平板觀看時模型更大更飽滿
+    const BASE_SCALE = 42;
+
+    function buildGeometryCoordinates() {
+      // 在以 B 為原點、BC 為 +u 軸、ED 為 +v 軸的局部平面座標 (u, v, z)：
+      const theta_u = -70 * Math.PI / 180; // u 軸方向 (沿 BC)
+      const theta_v = 20 * Math.PI / 180;  // v 軸方向 (沿 ED，垂直於 BC)
+
+      function toWorld(u, v, z) {
+        return [
+          u * Math.cos(theta_u) + v * Math.cos(theta_v),
+          u * Math.sin(theta_u) + v * Math.sin(theta_v),
+          z
+        ];
+      }
+
+      const u_H = 3;
+      const u_E = BE_len;
+      const v_HK = HK_len;
+      const z_AK = AK_len;
+      // D、E、F、G 共用 u_E，保持共線及垂足關係。
+      const v_F = u_E * (8 - u_E) / DE_len;
+
+      rawVertices = {
+        B: toWorld(0, 0, 0),
+        C: toWorld(8, 0, 0),
+        D: toWorld(u_E, DE_len, 0),
+        E: toWorld(u_E, 0, 0),
+        F: toWorld(u_E, v_F, 0),
+        H: toWorld(u_H, 0, 0),
+        K: toWorld(u_H, v_HK, 0),
+        G: toWorld(u_E, v_HK, 0),
+        A: toWorld(u_H, v_HK, z_AK),
+        P: toWorld(u_E, v_HK * (8-u_E)/5, z_AK * (8-u_E)/5)
+      };
+
+      buildDisplayCoordinates();
+    }
+
+    function isNearPointSpreadActive() {
+      return spreadNearPoints && (lessonStage >= 3 || document.getElementById('chkShowMethodP').checked);
+    }
+
+    function buildDisplayCoordinates() {
+      const spread = isNearPointSpreadActive();
+      const extraGap = spread ? 2.6 : 0;
+      const angle = -70 * Math.PI/180;
+      const uAxis = [Math.cos(angle),Math.sin(angle)];
+      const vAxis = [-uAxis[1],uAxis[0]];
+      const toWorld = (u,v,z) => [u*uAxis[0]+v*vAxis[0],u*uAxis[1]+v*vAxis[1],z];
+      const local = {};
+      for (const [name,pt] of Object.entries(rawVertices)) {
+        let u=pt[0]*uAxis[0]+pt[1]*uAxis[1];
+        const v=pt[0]*vAxis[0]+pt[1]*vAxis[1];
+        if (u>3+1e-9) u += extraGap * Math.min(1,(u-3)/(BE_len-3));
+        local[name]=[u,v,pt[2]];
+      }
+      if (spread) {
+        // Widen HE/KG, moving D/E/F/G together so G stays on DE.
+        // Reconstruct F as the schematic base triangle's orthocentre.
+        const eU=BE_len+extraGap;
+        // Keep F's distance along DE unchanged, so separating H/E does not
+        // accidentally make F/G collide. Adjust C within the schematic base.
+        const cU=eU+BE_len*(8-BE_len)/eU;
+        local.C=[cU,0,0];
+        local.F=[eU,eU*(cU-eU)/DE_len,0];
+        // P must remain ON the displayed AC and EP must stay perpendicular BC.
+        const ratio=(cU-eU)/(cU-3);
+        local.P=[eU,HK_len*ratio,AK_len*ratio];
+      }
+      displayVertices = Object.fromEntries(Object.entries(local).map(([k,v])=>[k,toWorld(...v)]));
+      const vertices=Object.values(displayVertices);
+      const center=[0,1,2].map(axis=>(Math.min(...vertices.map(v=>v[axis]))+Math.max(...vertices.map(v=>v[axis])))/2);
+      modelPoints=Object.fromEntries(Object.entries(displayVertices).map(([k,v])=>[k,v.map((x,i)=>(x-center[i])*BASE_SCALE)]));
+      modelRadius=Math.max(...Object.values(modelPoints).map(p=>Math.hypot(...p)));
+    }
+
+    function refreshDisplayGeometry() {
+      buildDisplayCoordinates();
+      const active=isNearPointSpreadActive();
+      document.getElementById('spreadBadge').classList.toggle('hidden',!active);
+      document.getElementById('btnSpread').setAttribute('aria-pressed',String(spreadNearPoints));
+      document.getElementById('spreadModeText').innerText=spreadNearPoints?'近點展開：開':'真實比例';
+      document.getElementById('geoCanvas').setAttribute('aria-label',active?
+        '可旋轉四面體教學示意圖，近點已展開，非等比例。H、E及K、G可分辨；方向鍵旋轉，加減鍵縮放，Home重設。':
+        '可旋轉四面體真實比例投影，方向鍵旋轉，加減鍵縮放，Home重設。');
+      requestRender();
+    }
+
+    function toggleNearPointSpread() {
+      spreadNearPoints=!spreadNearPoints;
+      refreshDisplayGeometry();
+    }
+
+    buildGeometryCoordinates();
+
+    const stageLabels = ['原題四面體', '垂心 F 與高線 DE', '連接 AE，檢查是否垂直 BC', 'AH 垂直 BC，試比較 BH 與 BE', 'AH、HK 都垂直 BC，交角為 ∠AHK', '加入 G，觀察長方形 HKGE'];
+
+    function setLessonStage(stage) {
+      lessonStage = Math.max(0, Math.min(5, stage));
+      document.getElementById('constructionLabel').innerText = stageLabels[lessonStage];
+      document.querySelectorAll('[data-stage]').forEach(btn => {
+        const active = Number(btn.dataset.stage) === lessonStage;
+        btn.setAttribute('aria-pressed', String(active));
+        btn.className = 'stage-btn rounded-lg border p-2 ' + (active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300');
+      });
+      document.getElementById('chkShowMarking').checked = lessonStage === 5;
+      document.getElementById('chkShowMethodP').checked = false;
+      refreshDisplayGeometry();
+      activeFocusPlane = 'ALL';
+      updateFocusDescription('ALL');
+      if (detailInsetOpen && lessonStage < 5) toggleDetailInset(false);
+      requestRender();
+    }
+
+    function toggleDetailInset(open = !detailInsetOpen) {
+      detailInsetOpen = open;
+      document.getElementById('detailInset').classList.toggle('hidden', !open);
+      document.getElementById('btnExaggerate').setAttribute('aria-expanded', String(open));
+      document.getElementById('exaggerateText').innerText = '局部放大：' + (open ? '開' : '關');
+      if (open) {
+        if (lessonStage < 5) setLessonStage(5);
+        drawDetailInset();
+      }
+      requestRender();
+    }
+
+    function drawDetailInset() {
+      if (!detailInsetOpen) return;
+      const inset = document.getElementById('detailCanvas');
+      const w = inset.getBoundingClientRect().width;
+      if (!w) return;
+      const dpr = window.devicePixelRatio || 1;
+      inset.width = w * dpr;
+      inset.height = 240 * dpr;
+      const c = inset.getContext('2d');
+      c.scale(dpr, dpr);
+      const left = w * 0.25, right = w * 0.67, bottom = 174, top = 80;
+      c.fillStyle = 'rgba(16,185,129,0.15)';
+      c.fillRect(left, top, right-left, bottom-top);
+      c.strokeStyle = '#34d399'; c.lineWidth = 2;
+      c.strokeRect(left, top, right-left, bottom-top);
+      c.strokeStyle = '#f59e0b'; c.beginPath(); c.moveTo(right,bottom); c.lineTo(right,28); c.stroke();
+      const fY = bottom - (bottom-top) * (BE_len * (8-BE_len) / DE_len) / HK_len;
+      const points = {H:[left,bottom], K:[left,top], E:[right,bottom], G:[right,top], F:[right,fY], D:[right,28]};
+      c.font = 'bold 13px sans-serif'; c.textBaseline = 'middle';
+      for (const [label,[x,y]] of Object.entries(points)) {
+        c.fillStyle = label === 'F' || label === 'D' ? '#fbbf24' : '#a7f3d0';
+        c.beginPath(); c.arc(x,y,3.5,0,Math.PI*2); c.fill();
+        c.fillText(label,x+(label==='H'||label==='K'?-20:10),y);
+      }
+      c.font = '12px sans-serif'; c.fillStyle = '#e2e8f0'; c.textAlign = 'center';
+      c.fillText('HE ≈ 0.0933 cm（橫向放大）',w/2,208);
+      c.fillText('HK = EG ≈ 2.9809 cm',w/2,230);
+      c.textAlign = 'left';
+    }
+
+    let activeFocusPlane = 'ALL';
+
+    const planeDescriptions = {
+      'ALL': {
+        badge: '全立體總覽',
+        title: '平面拆解提示：全立體總覽',
+        tool: '解題工具：空間觀察',
+        desc: '點擊上方「平面聚焦按鈕」，系統會將對應的三角形平面在 3D 圖中發光高亮，幫你養成「先鎖定平面、再列式計算」的習慣！'
+      },
+      'BCD': {
+        badge: '底面 △BCD',
+        title: '當前鎖定：底面 △BCD（斜三角形）',
+        tool: '工具：內角和 + 正弦公式 (Sine Rule)',
+        desc: '已知 ∠CBD = 70°、∠BDC = 50° 及 BC = 8 cm。先求 ∠BCD = 60°，再用正弦公式即可求出 BD ≈ 9.04 cm！'
+      },
+      'BED': {
+        badge: '底面直角 △BED',
+        title: '當前鎖定：直角 △BED（∠BED = 90°）',
+        tool: '工具：基礎三角比 cos 70°',
+        desc: '已知 ∠CBD = 70° 且 ED ⊥ BC。在直角 △BED 中，cos 70° = BE / BD，直接算出 BE ≈ 3.09 cm！'
+      },
+      'ABE': {
+        badge: '斜面 △ABE',
+        title: '當前鎖定：斜面 △ABE',
+        tool: '工具：餘弦公式 (Cosine Rule)',
+        desc: '已知 AB = 6 cm、BE ≈ 3.09 cm 及夾角 ∠ABE = 60°，應用餘弦公式即可求得斜線段 AE ≈ 5.20 cm！'
+      },
+      'AEG': {
+        badge: '直角 △AEG',
+        title: '當前鎖定：直角 △AEG（∠AGE = 90°）',
+        tool: '工具：基礎三角比 cos 55°',
+        desc: 'G 是 A 到 DE 的垂足，E、F、G、D 共線，所以 ∠AEG = ∠AEF = 55°，且 AG ⟂ DE。在直角 △AEG 中，cos 55° = EG / AE，求得 EG ≈ 2.98 cm！'
+      },
+      'AHK': {
+        badge: '交角截面 △AHK',
+        title: '當前鎖定：交角截面 △AHK 與長方形 HKGE',
+        tool: '工具：長方形對邊相等 (HK = EG) + cos θ',
+        desc: 'AH 與 HK 在公共邊上的同一點 H 相交，並且都垂直 BC，所以 ∠AHK 是兩平面的交角。繼續比較 AE 與 AH，再判斷交角大小。'
+      },
+      'DEP': {
+        badge: 'E 點交角截面 △DEP',
+        title: '當前鎖定：EP ⟂ BC，P 在 AC 上',
+        tool: '工具：相似三角形 + 餘弦公式',
+        desc: '由 E 作 EP 垂直 BC，交 AC 於 P。EP 與 ED 在公共邊的同一點 E 相交，並均垂直 BC，因此 ∠PEF = ∠PED 就是兩平面的交角。'
+      }
+    };
+
+    function setFocusPlane(plane) {
+      const requiredStage = {ALL:0, BCD:0, BED:1, ABE:2, AEG:5, AHK:4, DEP:2};
+      if (lessonStage < (requiredStage[plane] || 0)) setLessonStage(requiredStage[plane]);
+      document.getElementById('chkShowMethodP').checked = plane === 'DEP';
+      refreshDisplayGeometry();
+      activeFocusPlane = plane;
+      updateFocusDescription(plane);
+      requestRender();
+    }
+
+    function updateFocusDescription(plane) {
+      document.querySelectorAll('.focus-btn').forEach(btn => {
+        btn.className = "focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white text-slate-700 hover:bg-indigo-50 border border-slate-300 transition";
+      });
+      const activeBtn = document.getElementById(`btnFocus_${plane}`);
+      if (activeBtn) {
+        activeBtn.className = "focus-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold shadow-sm transition";
+      }
+
+      const info = planeDescriptions[plane] || planeDescriptions['ALL'];
+      document.getElementById('currentFocusBadge').innerText = info.badge;
+      document.getElementById('inspectorTitle').innerHTML = `<i aria-hidden="true" class="fa-solid fa-layer-group mr-1.5"></i> ${info.title}`;
+      document.getElementById('inspectorTool').innerText = info.tool;
+      document.getElementById('inspectorDesc').innerText = info.desc;
+
+      requestRender();
+    }
+
+    // ---------- 3D 渲染引擎 (支援滾輪縮放、雙指縮放、平移與 360° 全方向旋轉) ----------
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+
+    const DEFAULT_ROT_X = -0.78;
+    const DEFAULT_ROT_Y = 0.0;
+    const DEFAULT_ZOOM = 1;
+
+    let rotX = DEFAULT_ROT_X;
+    let rotY = DEFAULT_ROT_Y;
+    let zoomLevel = DEFAULT_ZOOM;
+    let panX = 0;
+    let panY = 0;
+
+    let isDragging = false;
+    let isPanning = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let lastPinchDist = null;
+    let autoRotate = false;
+    let animationFrameId = null;
+
+    function updateZoomBadge() {
+      const badge = document.getElementById('zoomBadge');
+      if (badge) {
+        badge.innerText = Math.round(zoomLevel * 100) + '%';
+      }
+    }
+
+    function adjustZoom(delta) {
+      zoomLevel = Math.max(0.5, Math.min(3.5, zoomLevel + delta));
+      updateZoomBadge();
+      requestRender();
+    }
+
+    function resetZoomAndPan() {
+      zoomLevel = DEFAULT_ZOOM;
+      panX = 0;
+      panY = 0;
+      updateZoomBadge();
+      requestRender();
+    }
+
+    function focusZoomHKGE() {
+      setLessonStage(5);
+      setFocusPlane('AHK');
+      toggleDetailInset(true);
+    }
+
+    function resizeCanvas() {
+      const container = document.getElementById('canvasContainer');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+      updateZoomBadge();
+      render3D();
+      drawDetailInset();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function project3D(pt) {
+      // A sphere enclosing the fixed model keeps every vertex in frame at 100%,
+      // even after rotation; reserve space for labels and floating controls.
+      const responsiveFactor = Math.max(1, Math.min(width - 100, height - 140)) / (2.15 * modelRadius) * zoomLevel;
+      const [x, y, z] = pt;
+
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      const x1 = x * cosY + z * sinY;
+      const y1 = y;
+      const z1 = -x * sinY + z * cosY;
+
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+      const x2 = x1;
+      const y2 = y1 * cosX - z1 * sinX;
+      const z2 = y1 * sinX + z1 * cosX;
+
+      const cameraDist = 3 * modelRadius;
+      const scale = responsiveFactor * cameraDist / (cameraDist + z2);
+
+      return {
+        x: width / 2 - 10 + x2 * scale + panX,
+        y: height / 2 - y2 * scale + panY,
+        depth: z2
+      };
+    }
+
+    function render3D() {
+      if (!ctx || !width || !height) return;
+      ctx.clearRect(0, 0, width, height);
+      const showGiven = document.getElementById('chkShowGiven').checked;
+      const showMethodP = document.getElementById('chkShowMethodP').checked;
+      const p = Object.fromEntries(Object.entries(modelPoints).map(([k,v]) => [k, project3D(v)]));
+      drawFace([p.B,p.C,p.D], activeFocusPlane === 'BCD' ? 'rgba(245,158,11,0.35)' : 'rgba(30,41,59,0.45)');
+      drawFace([p.A,p.B,p.C], 'rgba(56,189,248,0.10)');
+      drawFace([p.A,p.C,p.D], 'rgba(192,132,252,0.08)');
+      const faces = {BED:['B','E','D'], ABE:['A','B','E'], AEG:['A','E','G'], AHK:['A','H','K'], DEP:['D','E','P']};
+      if (faces[activeFocusPlane]) drawFace(faces[activeFocusPlane].map(k=>p[k]),'rgba(56,189,248,0.30)');
+      if (lessonStage >= 1) {
+        drawLine(p.D,p.E,'#f59e0b',2.2);
+        drawRightAngle3D(p.D,p.E,p.C,9,'#f59e0b');
+      }
+      if (lessonStage >= 2) drawLine(p.A,p.E,'#fb7185',2.5);
+      if (lessonStage >= 3) {
+        drawLine(p.A,p.H,'#38bdf8',2.5,[5,3]);
+        drawRightAngle3D(p.A,p.H,p.B,9,'#38bdf8');
+      }
+      if (lessonStage >= 4) {
+        drawLine(p.H,p.K,'#10b981',2.5);
+        drawLine(p.A,p.K,'#a7f3d0',2,[4,3]);
+        drawRightAngle3D(p.A,p.K,p.H,9,'#a7f3d0');
+        drawRightAngle3D(p.K,p.H,p.C,9,'#10b981');
+        drawAngleMarker(p.A,p.H,p.K,12,'#7dd3fc');
+      }
+      if (lessonStage >= 5) {
+        drawFace([p.H,p.K,p.G,p.E],'rgba(16,185,129,0.25)');
+        drawLine(p.K,p.G,'#10b981',2.4,[4,3]);
+        drawLine(p.E,p.G,'#10b981',2.6,[5,4]);
+        drawLine(p.H,p.E,'#10b981',2.6);
+        drawLine(p.A,p.G,'#34d399',2.4);
+        drawRightAngle3D(p.A,p.G,p.E,9,'#34d399');
+      }
+      if (showMethodP) {
+        drawFace([p.D,p.E,p.P],'rgba(217,70,239,0.20)');
+        drawLine(p.E,p.P,'#f0abfc',3);
+        drawLine(p.P,p.D,'#e879f9',2.2,[5,4]);
+        drawRightAngle3D(p.P,p.E,p.C,10,'#f0abfc');
+        drawAngleMarker(p.P,p.E,p.D,12,'#f0abfc');
+      }
+      drawLine(p.B,p.D,'#94a3b8',2,[6,5]);
+      drawLine(p.A,p.B,'#38bdf8',2.8); drawLine(p.B,p.C,'#38bdf8',2.8);
+      drawLine(p.C,p.D,'#c084fc',2.6); drawLine(p.A,p.D,'#c084fc',2.4); drawLine(p.A,p.C,'#e2e8f0',2.6);
+      drawNode(p.A,'A','#38bdf8',0,-16); drawNode(p.B,'B','#38bdf8',-18,2);
+      drawNode(p.C,'C','#e2e8f0',0,18); drawNode(p.D,'D','#c084fc',18,2);
+      if (lessonStage >= 1) { drawNode(p.E,'E','#fb7185',22,18); drawNode(p.F,'F','#fbbf24',16,-8); }
+      if (lessonStage >= 3) drawNode(p.H,'H','#38bdf8',-22,-10);
+      if (lessonStage >= 4) drawNode(p.K,'K','#10b981',-22,-14);
+      if (lessonStage >= 5) drawNode(p.G,'G','#34d399',22,-8);
+      if (showMethodP) drawNode(p.P,'P','#f0abfc',22,-8);
+      if (showGiven) {
+        drawTag((p.A.x+p.B.x)/2-40,(p.A.y+p.B.y)/2-12,'AB = 6','#38bdf8');
+        drawTag((p.B.x+p.C.x)/2-52,(p.B.y+p.C.y)/2+16,'BC = 8','#38bdf8');
+        drawTag(p.B.x+18,p.B.y-12,'70°','#38bdf8'); drawTag(p.D.x-42,p.D.y+14,'50°','#c084fc');
+        if (lessonStage >= 2) drawTag(p.E.x+20,p.E.y+36,'∠AEF = 55°','#fb7185');
+      }
+    }
+
+    function drawAngleMarker(a, o, b, radius, color) {
+      if (Math.hypot(a.x-o.x,a.y-o.y)<1 || Math.hypot(b.x-o.x,b.y-o.y)<1) return;
+      const start=Math.atan2(a.y-o.y,a.x-o.x);
+      const end=Math.atan2(b.y-o.y,b.x-o.x);
+      const delta=Math.atan2(Math.sin(end-start),Math.cos(end-start));
+      ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(o.x,o.y,radius,start,start+delta,delta<0); ctx.stroke(); ctx.restore();
+      const mid=start+delta/2;
+      drawTag(o.x+(radius+7)*Math.cos(mid)-3,o.y+(radius+7)*Math.sin(mid),'θ',color);
+    }
+
+    function drawLine(p1, p2, color, width, dash = []) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash(dash);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawFace(pts, fillColor) {
+      if (pts.length < 3) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawNode(pt, label, color, offX, offY) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, ['H','E','K','G','P'].includes(label) ? 4.5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#020617';
+      ctx.stroke();
+
+      const isSmallScreen = width < 340;
+      const highlight=['H','E','K','G','P'].includes(label);
+      if (highlight) {
+        ctx.beginPath(); ctx.moveTo(pt.x,pt.y); ctx.lineTo(pt.x+offX*0.7,pt.y+offY*0.7);
+        ctx.strokeStyle=color; ctx.lineWidth=1; ctx.stroke();
+      }
+      ctx.font = highlight ? 'bold 14px system-ui, sans-serif' : isSmallScreen ? 'bold 11px monospace, sans-serif' : 'bold 12px monospace, sans-serif';
+      const tw = ctx.measureText(label).width;
+      const bx = pt.x + offX - tw / 2 - 3;
+      const by = pt.y + offY - 8;
+      
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.fillRect(bx, by, tw + 6, 14);
+      ctx.strokeStyle = 'rgba(71, 85, 105, 0.7)';
+      ctx.strokeRect(bx, by, tw + 6, 14);
+
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, pt.x + offX, pt.y + offY - 1);
+      ctx.restore();
+    }
+
+    function drawTag(x, y, text, color) {
+      ctx.save();
+      const isSmallScreen = width < 340;
+      ctx.font = isSmallScreen ? 'bold 10px system-ui, sans-serif' : 'bold 11px system-ui, sans-serif';
+      const tw = ctx.measureText(text).width;
+      ctx.fillStyle = 'rgba(10, 15, 29, 0.92)';
+      ctx.fillRect(x - 4, y - 8, tw + 8, 15);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - 4, y - 8, tw + 8, 15);
+
+      ctx.fillStyle = color;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y - 0.5);
+      ctx.restore();
+    }
+
+    function drawRightAngle3D(A, O, B, size, color) {
+      const d1x = A.x - O.x, d1y = A.y - O.y;
+      const l1 = Math.hypot(d1x, d1y);
+      const d2x = B.x - O.x, d2y = B.y - O.y;
+      const l2 = Math.hypot(d2x, d2y);
+      if (l1 === 0 || l2 === 0) return;
+
+      const u1x = (d1x / l1) * size, u1y = (d1y / l1) * size;
+      const u2x = (d2x / l2) * size, u2y = (d2y / l2) * size;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(O.x + u1x, O.y + u1y);
+      ctx.lineTo(O.x + u1x + u2x, O.y + u1y + u2y);
+      ctx.lineTo(O.x + u2x, O.y + u2y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function requestRender() {
+      if (!autoRotate) {
+        requestAnimationFrame(render3D);
+      }
+    }
+
+    function toggleAutoRotate() {
+      autoRotate = !autoRotate;
+      const btn = document.getElementById('btnAutoRotate');
+      const txt = document.getElementById('autoRotateText');
+      if (autoRotate) {
+        btn.className = "px-2.5 py-1.5 text-xs rounded-lg bg-indigo-600 text-white shadow-sm transition flex items-center";
+        txt.innerText = "停止旋轉";
+        animateLoop();
+      } else {
+        btn.className = "px-2.5 py-1.5 text-xs rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 transition flex items-center";
+        txt.innerText = "自動旋轉";
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      }
+    }
+
+    function animateLoop() {
+      if (!autoRotate) return;
+      if (!isDragging) {
+        rotY += 0.006;
+        render3D();
+      }
+      animationFrameId = requestAnimationFrame(animateLoop);
+    }
+
+    function reset3DView() {
+      rotX = DEFAULT_ROT_X;
+      rotY = DEFAULT_ROT_Y;
+      zoomLevel = DEFAULT_ZOOM;
+      panX = 0;
+      panY = 0;
+      updateZoomBadge();
+      requestRender();
+    }
+
+    const container = document.getElementById('canvasContainer');
+
+    function onPointerDown(clientX, clientY, shiftKey = false) {
+      isDragging = true;
+      isPanning = shiftKey;
+      lastMouseX = clientX;
+      lastMouseY = clientY;
+    }
+
+    function onPointerMove(clientX, clientY) {
+      if (!isDragging) return;
+      const dx = clientX - lastMouseX;
+      const dy = clientY - lastMouseY;
+      lastMouseX = clientX;
+      lastMouseY = clientY;
+
+      if (isPanning) {
+        panX += dx;
+        panY += dy;
+      } else {
+        rotY += dx * 0.0085;
+        rotX += dy * 0.0085;
+      }
+      if (!autoRotate) {
+        render3D();
+      }
+    }
+
+    function onPointerUp() {
+      isDragging = false;
+      isPanning = false;
+      lastPinchDist = null;
+    }
+
+    container.addEventListener('mousedown', e => {
+      if (e.target.closest('button, input, label')) return;
+      if (e.button === 2 || e.shiftKey) {
+        onPointerDown(e.clientX, e.clientY, true);
+      } else {
+        onPointerDown(e.clientX, e.clientY, false);
+      }
+    });
+    container.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('mousemove', e => onPointerMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', onPointerUp);
+
+    container.addEventListener('wheel', e => {
+      e.preventDefault();
+      const zoomDelta = e.deltaY < 0 ? 0.12 : -0.12;
+      adjustZoom(zoomDelta);
+    }, { passive: false });
+
+    container.addEventListener('touchstart', e => {
+      if (e.target.closest('button, input, label')) return;
+      if (e.touches.length === 1) {
+        onPointerDown(e.touches[0].clientX, e.touches[0].clientY, false);
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDist = Math.hypot(dx, dy);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', e => {
+      if (isDragging && e.touches.length === 1) {
+        onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+      } else if (e.touches.length === 2 && lastPinchDist !== null) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const delta = (dist - lastPinchDist) * 0.006;
+        lastPinchDist = dist;
+        adjustZoom(delta);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', onPointerUp);
+
+    let currentStep = 1;
+
+    function selectPlaneStep2(plane) {
+      const fb = document.getElementById('planeFeedback2');
+      fb.classList.remove('hidden');
+      if (plane === 'BCD') {
+        setFocusPlane('BCD');
+        fb.className = "p-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-900 leading-relaxed";
+        fb.innerHTML = `<strong><i aria-hidden="true" class="fa-solid fa-check mr-1"></i> 定位正確！</strong> 在底面 $\\triangle BCD$ 中，我們有齊 $\\angle CBD=70^\\circ$、$\\angle BDC=50^\\circ$ 和 $BC=8\\text{ cm}$（兩角一邊 AAS），3D 圖已為你高亮聚焦底面 $\\triangle BCD$！`;
+      } else if (plane === 'ABD') {
+        fb.className = "p-3 rounded-lg text-xs bg-rose-50 border border-rose-200 text-rose-900 leading-relaxed";
+        fb.innerHTML = `<strong>條件不足！</strong> 在 $\\triangle ABD$ 中只有 $AB=6\\text{ cm}$，缺少角度與其他邊長，無法直接求 $BD$。試試看底面的三角形！`;
+      } else {
+        fb.className = "p-3 rounded-lg text-xs bg-amber-50 border border-amber-200 text-amber-900 leading-relaxed";
+        fb.innerHTML = `<strong>還差一步！</strong> 直角 $\\triangle BED$ 雖然有 $70^\\circ$ 和 $90^\\circ$，但我們還不知道 $BE$ 或 $DE$ 的長度，必須先在整個底面 $\\triangle BCD$ 用正弦公式求出 $BD$！`;
+      }
+      renderMath(fb);
+    }
+
+    function selectPlaneStep3(plane) {
+      const fb = document.getElementById('planeFeedback3');
+      fb.classList.remove('hidden');
+      if (plane === 'BED') {
+        setFocusPlane('BED');
+        fb.className = "p-3 rounded-lg text-xs bg-emerald-50 border border-emerald-200 text-emerald-900 leading-relaxed";
+        fb.innerHTML = `<strong><i aria-hidden="true" class="fa-solid fa-check mr-1"></i> 完全正確！</strong> 3D 圖已為你高亮聚焦直角 $\\triangle BED$！已知斜邊 $BD \\approx 9.0441\\text{ cm}$ 與 $\\angle EBD = 70^\\circ$，直接用 $\\cos 70^\\circ$ 即可求出 $BE$！`;
+      } else {
+        fb.className = "p-3 rounded-lg text-xs bg-rose-50 border border-rose-200 text-rose-900 leading-relaxed";
+        fb.innerHTML = `<strong>再看清楚！</strong> 我們已經有 $BD$ 和 $\\angle CBD=70^\\circ$，而且 $DE \\perp BC$，所以鎖定包含 $B, E, D$ 的直角 $\\triangle BED$ 最快！`;
+      }
+      renderMath(fb);
+    }
+
+    function checkStep1() {
+      const val = document.querySelector('input[name="q1"]:checked')?.value;
+      const fb = document.getElementById('feedback1');
+      fb.classList.remove('hidden');
+
+      if (val === 'B') {
+        setFocusPlane('BED');
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-emerald-50 border border-emerald-200 text-emerald-900";
+        fb.innerHTML = `<strong>太棒了！完全正確！</strong><br>
+        垂心（Orthocentre）是三角形三條高線的交點，因此過頂點 $D$ 穿過垂心 $F$ 的直線 $DE$ 必然垂直於底邊 $BC$，即 $\\angle DEB = 90^\\circ$！`;
+        renderMath(fb);
+        fb.innerHTML += '<button type="button" onclick="goToStep(2)" class="block mt-3 px-3 py-2 rounded-lg bg-indigo-600 text-white">繼續求 BD</button>';
+      } else {
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-rose-50 border border-rose-200 text-rose-900";
+        const hints = {
+          A: '你把垂心當成中線交點。回想：中線交點稱為甚麼？垂心涉及的又是哪一類線？',
+          C: 'DF 位於底面 BCD 內。底面內的一條非零線段，能垂直整個底面嗎？試先找頂點 D 的對邊。'
+        };
+        fb.innerText = hints[val] || '請先選一個答案，再檢查你的想法。';
+        renderMath(fb);
+      }
+    }
+
+    function checkStep2() {
+      const input = parseFloat(document.getElementById('inputBD').value);
+      const fb = document.getElementById('feedback2');
+      fb.classList.remove('hidden');
+
+      if (Number.isFinite(input) && Math.abs(input - BD_len) < 0.005) {
+        setFocusPlane('BCD');
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-emerald-50 border border-emerald-200 text-emerald-900";
+        fb.innerHTML = `<strong>正弦公式計算正確！$BD \\approx 9.04\\text{ cm}$</strong>（保留作後續計算的精確值為 $9.0441\\text{ cm}$）。`;
+        renderMath(fb);
+        fb.innerHTML += '<button type="button" onclick="goToStep(3)" class="block mt-3 px-3 py-2 rounded-lg bg-indigo-600 text-white">繼續求 BE</button>';
+      } else {
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-rose-50 border border-rose-200 text-rose-900 overflow-x-auto";
+        fb.innerHTML = `數值不太對哦！請檢查計算：<br>
+        $$BD = \\frac{8 \\cdot \\sin 60^\\circ}{\\sin 50^\\circ} \\approx 9.04\\text{ cm}$$`;
+        renderMath(fb);
+      }
+    }
+
+    function checkStep3() {
+      const input = parseFloat(document.getElementById('inputBE').value);
+      const fb = document.getElementById('feedback3');
+      fb.classList.remove('hidden');
+
+      if (Number.isFinite(input) && Math.abs(input - BE_len) < 0.005) {
+        setFocusPlane('BED');
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-emerald-50 border border-emerald-200 text-emerald-900";
+        fb.innerHTML = `<strong>正確！$BE \\approx 3.09\\text{ cm}$</strong>（精確值約 $3.0933\\text{ cm}$）。<br>
+        順利拿下 (a) 部 3 分！讀完回饋後，按下方按鈕進入交角探究。`;
+        renderMath(fb);
+        fb.innerHTML += '<button type="button" onclick="goToStep(4)" class="block mt-3 px-3 py-2 rounded-lg bg-indigo-600 text-white">進入交角探究</button>';
+      } else {
+        fb.className = "p-3.5 rounded-xl text-xs sm:text-sm bg-rose-50 border border-rose-200 text-rose-900 overflow-x-auto";
+        fb.innerHTML = `計算有誤，請再試一次：<br>
+        $$BE = BD \\cdot \\cos 70^\\circ \\approx 9.0441 \\cdot \\cos 70^\\circ \\approx 3.09\\text{ cm}$$`;
+        renderMath(fb);
+      }
+    }
+
+    function toggleMethodP(show) {
+      if (show) showMethodP();
+      else setFocusPlane('ALL');
+    }
+
+    function showMethodP() {
+      setLessonStage(2);
+      setFocusPlane('DEP');
+    }
+
+    function switchBMethod(method) {
+      const tabs = {
+        method1: document.getElementById('tabMethod1'),
+        method2: document.getElementById('tabMethod2'),
+        method3: document.getElementById('tabMethod3')
+      };
+      const contents = {
+        method1: document.getElementById('method1Content'),
+        method2: document.getElementById('method2Content'),
+        method3: document.getElementById('method3Content')
+      };
+
+      for (let k in tabs) {
+        if (k === method) {
+          tabs[k].className = "py-2.5 px-3 rounded-lg bg-indigo-600 text-white shadow-sm transition flex items-center justify-center text-center";
+          contents[k].classList.remove('hidden');
+        } else {
+          tabs[k].className = "py-2.5 px-3 rounded-lg text-slate-600 hover:bg-white transition flex items-center justify-center text-center";
+          contents[k].classList.add('hidden');
+        }
+      }
+
+      if (method === 'method1') {
+        setLessonStage(5);
+        setFocusPlane('AHK');
+      } else if (method === 'method3') {
+        showMethodP();
+      } else {
+        setFocusPlane('AEG');
+      }
+      renderMath();
+    }
+
+
+    function checkAngleChoice(choice) {
+      setLessonStage(2);
+      setFocusPlane('ABE');
+      const fb = document.getElementById('angleFeedback');
+      fb.classList.remove('hidden');
+      const messages = {
+        given: 'ED 已垂直 BC。另一條線 AE 是否也垂直 BC？試比較 A 到 BC 的垂足 H 與 E：先求 BH，再與 BE 比較。',
+        verify: '判斷方向正確。交角需要兩條垂直公共邊的線，且它們在公共邊上的同一點相交。下一步檢查 AE 是否符合。',
+        sixty: '∠ABC 是 AB 與 BC 的夾角，兩條線都在平面 ABC 內。它不是兩平面的交角；試先檢查 AE 是否垂直公共邊 BC。'
+      };
+      fb.innerText = messages[choice];
+      document.getElementById('footCheck').classList.remove('hidden');
+      setLessonStage(proofRevealed ? 5 : sectionRevealed ? 4 : 3);
+      if (sectionRevealed) setFocusPlane('AHK');
+      renderMath(document.getElementById('footCheck'));
+    }
+
+    function invalidateFoot() {
+      angleVerified = false;
+      sectionRevealed = false;
+      proofRevealed = false;
+      for (const id of ['angleConstruction', 'lengthComparison', 'mainProof', 'feedbackContainer4']) {
+        document.getElementById(id).classList.add('hidden');
+      }
+      document.getElementById('footFeedback').innerText = '';
+      document.getElementById('comparisonFeedback').innerText = '';
+      setProofMode('reason');
+      if (currentStep === 4) setLessonStage(3);
+    }
+
+    function checkFoot() {
+      const input = Number(document.getElementById('inputBH').value);
+      const fb = document.getElementById('footFeedback');
+      if (!document.getElementById('inputBH').value.trim() || Math.abs(input - 3) > 0.000001) {
+        invalidateFoot();
+        fb.innerText = 'BH 是 60° 的鄰邊，AB 是斜邊。試用 BH = 6 cos 60°，不要用正弦。';
+        return;
+      }
+      angleVerified = true;
+      fb.innerText = 'BH = 3 cm，但 BE ≈ 3.0933 cm，所以 H ≠ E。A 到直線 BC 的垂足只有一個，故 AE 不垂直 BC，∠AEF 不是交角。';
+      setLessonStage(proofRevealed ? 5 : sectionRevealed ? 4 : 3);
+      if (sectionRevealed) setFocusPlane('AHK');
+      document.getElementById('angleConstruction').classList.remove('hidden');
+    }
+
+    function showIntersectionSection() {
+      sectionRevealed = true;
+      setLessonStage(proofRevealed ? 5 : 4);
+      setFocusPlane('AHK');
+      document.getElementById('lengthComparison').classList.remove('hidden');
+      renderMath(document.getElementById('lengthComparison'));
+    }
+
+    function checkLengthComparison(choice) {
+      const fb = document.getElementById('comparisonFeedback');
+      if (choice !== 'AE') {
+        fb.innerText = choice === 'equal' ? 'H 與 E 相距約 0.0933 cm，並非同一點。圖上很接近，不能當作重合；AE 是直角三角形的斜邊。' : '先找直角：AH ⟂ HE，所以 AE 才是斜邊。斜邊與直角邊，哪一條較長？';
+        return;
+      }
+      fb.innerText = '正確：AE 是斜邊，而且 HE > 0，所以 AE > AH。接著把這個大小關係放入餘弦比值。';
+      proofRevealed = true;
+      document.getElementById('mainProof').classList.remove('hidden');
+      setLessonStage(5);
+      setFocusPlane('AHK');
+      toggleDetailInset(true);
+      renderMath(document.getElementById('mainProof'));
+    }
+
+    function setProofMode(mode) {
+      document.getElementById('reasonProof').classList.toggle('hidden', mode !== 'reason');
+      document.getElementById('numericProof').classList.toggle('hidden', mode !== 'numeric');
+      for (const [id,value] of [['btnProofReason','reason'], ['btnProofNumeric','numeric']]) {
+        const btn = document.getElementById(id), active = mode === value;
+        btn.setAttribute('aria-pressed', String(active));
+        btn.className = 'rounded-lg px-3 py-2 ' + (active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800');
+      }
+      renderMath(document.getElementById('mainProof'));
+    }
+
+    function handleFinalClaim(choice) {
+      const fb = document.getElementById('feedbackContainer4');
+      fb.classList.remove('hidden');
+      fb.className = 'p-3 rounded-xl text-xs leading-relaxed border ' + (choice === 'agree' ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50 border-amber-300');
+      if (choice === 'agree') {
+        fb.innerHTML = '<strong>同意。</strong>因為 AE > AH，且 HK = EG = AE cos 55°，所以 cos θ > cos 55°，從而 θ < 55°。請用自己的話再說明：為甚麼 AE > AH？為甚麼餘弦較大，交角反而較小？';
+      } else if (choice === 'rounded') {
+        fb.innerText = '單看 55.0° 的確不能確定原值在哪一側。不過我們已有 AE > AH，因此 cos θ > cos 55°。現在可以不用依賴捨入值，確定 θ 與 55° 的大小。請再選一次。';
+      } else {
+        fb.innerText = '請檢查最後一步：在銳角範圍，cos θ > cos 55° 表示 θ 較小。再想想「不超過」包含哪些情況。';
+      }
+    }
+
+    function goToStep(s) {
+      currentStep = s;
+      const stage = s === 1 ? 0 : s < 4 ? 1 : proofRevealed ? 5 : sectionRevealed ? 4 : angleVerified ? 3 : 2;
+      setLessonStage(stage);
+      const focus = s === 2 ? 'BCD' : s === 3 ? 'BED' : s === 4 && sectionRevealed ? 'AHK' : s === 4 && !angleVerified ? 'ABE' : 'ALL';
+      setFocusPlane(focus);
+      for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`stepCard${i}`);
+        const lbl = document.getElementById(`labelStep${i}`);
+        if (i === s) {
+          card.classList.remove('hidden');
+          lbl.className = "py-1.5 px-2 rounded-lg bg-indigo-50 font-bold text-indigo-700 border border-indigo-200 transition truncate";
+        } else {
+          card.classList.add('hidden');
+          lbl.className = "py-1.5 px-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 transition truncate";
+        }
+      }
+
+      document.getElementById('stepProgressText').innerText = `第 ${s} / 4 步`;
+      document.getElementById('progressBar').style.width = `${(s / 4) * 100}%`;
+      renderMath();
+    }
+
+    function showFullSolutionModal() {
+      const modal = document.getElementById('solutionModal');
+      modal.classList.remove('hidden');
+      renderMath(modal);
+    }
+
+    function closeModal() {
+      document.getElementById('solutionModal').classList.add('hidden');
+    }
+
+    canvas.addEventListener('keydown', e => {
+      const moves = {ArrowLeft:[0,-0.08], ArrowRight:[0,0.08], ArrowUp:[-0.08,0], ArrowDown:[0.08,0]};
+      if (moves[e.key]) { e.preventDefault(); rotX += moves[e.key][0]; rotY += moves[e.key][1]; requestRender(); }
+      else if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustZoom(0.15); }
+      else if (e.key === '-') { e.preventDefault(); adjustZoom(-0.15); }
+      else if (e.key === 'Home') { e.preventDefault(); reset3DView(); }
+    });
+
+    window.onload = function() {
+      setLessonStage(0);
+      resizeCanvas();
+      renderMath();
+    };
+  </script>
+</body>
+</html>
